@@ -5,6 +5,8 @@ import Header from '@/components/Header';
 import PatientTable from '@/components/PatientTable';
 import PaginationControl from '@/components/PaginationControl';
 import HomeActions from '@/components/HomeActions';
+import SectionTitle from '@/components/SectionTitle';
+import { Typography } from '@mui/material';
 
 const mockPatients = [
   { id: 1, name: 'Luis Garrido Perera', phone: '9988776655', email: 'luisgarrido@gmail.com' },
@@ -29,6 +31,10 @@ export default function PatientManagement() {
 
   return (
     <div className="min-h-screen">
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 600, marginTop: 4, marginLeft:4 }}>
+        Pacientes
+      </Typography>
+
       <main>
         {/* Contenedor principal centrado y limitado */}
         <div className="container mx-auto max-w-screen-lg px-4 py-8">
