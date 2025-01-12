@@ -17,7 +17,7 @@ export default function HomeActions({ searchTerm, setSearchTerm, onAddPatient })
     >
       <TextField
         fullWidth
-        placeholder="Buscar paciente"
+        placeholder="Buscar por nombre, teléfono o email"
         variant="outlined"
         size="small"
         value={searchTerm}

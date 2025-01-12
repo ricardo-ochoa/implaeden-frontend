@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Typography, CircularProgress, Alert, Snackbar } from '@mui/material';
 import { usePatients } from '../../lib/hooks/usePatients';
 import PatientTable from '@/components/PatientTable';
@@ -15,9 +15,8 @@ export default function PatientManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false); // Estado del modal
   const [showAlert, setShowAlert] = useState(false); // Estado para mostrar el alert
-  const { patients, totalPages, loading, error, refreshPatientsList } = usePatients(page, searchTerm); // Traemos `refreshPatientsList`
   const { savePatient, loading: saving, error: saveError } = useSavePatient();
-
+  const { patients, totalPages, loading, error, refreshPatientsList } = usePatients(page, searchTerm);
   const handlePageChange = (event, value) => {
     setPage(value);
   };
@@ -59,7 +58,7 @@ export default function PatientManagement() {
         <div className="container mx-auto max-w-screen-lg px-4 py-8">
           <HomeActions
             searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
+            setSearchTerm={setSearchTerm} // Actualiza el término de búsqueda
             onAddPatient={handleAddPatient}
           />
 
