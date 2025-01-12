@@ -61,11 +61,11 @@ export default function AddPatientModal({ open, onClose, onSave }) {
           width: 400,
           bgcolor: 'background.paper',
           boxShadow: 24,
-          p: 4,
+          p: 3,
           borderRadius: 2,
         }}
       >
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight:600, textAlign: "center" }}>
           Agregar nuevo paciente
         </Typography>
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -215,28 +215,8 @@ export default function AddPatientModal({ open, onClose, onSave }) {
               />
             )}
           />
-{/* 
-          <Controller
-            name="foto"
-            control={control}
-            render={({ field }) => (
-              <input
-                type="file"
-                onChange={(e) => field.onChange(e.target.files)}
-                accept="image/*"
-              />
-            )}
-          /> */}
           
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={!isValid}
-            >
-              Guardar
-            </Button>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, gap:2 }}>
             <Button
               variant="outlined"
               color="secondary"
@@ -246,6 +226,15 @@ export default function AddPatientModal({ open, onClose, onSave }) {
               }}
             >
               Cancelar
+            </Button>
+            <Button
+            fullWidth
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={!isValid}
+            >
+              Guardar
             </Button>
           </Box>
 

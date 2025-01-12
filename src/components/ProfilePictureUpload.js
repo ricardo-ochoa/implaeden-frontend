@@ -24,14 +24,15 @@ export default function ProfilePictureUpload({ onChange }) {
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
       <Avatar
         src={preview || undefined}
-        sx={{ width: 100, height: 100, mb: 2 }}
+        sx={{ width: 100, height: 100, mb: 1 }}
       />
       <Button
         variant="contained"
+        size='small'
         component="label"
         startIcon={<CloudUpload />}
       >
-        Subir Foto
+        Foto de perfil
         <input
           type="file"
           hidden
