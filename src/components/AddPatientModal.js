@@ -43,13 +43,9 @@ export default function AddPatientModal({ open, onClose, onSave }) {
     if (data.foto) {
       formData.append('foto', data.foto); // Asegúrate de pasar el archivo directamente
     }
-  
-    console.log("FormData antes de enviar:", formData);
     onSave(formData); // Enviar el FormData
     reset(); // Limpiar el formulario
   };
-  
-  
 
   const minDate = `${currentYear - 100}-01-01`; // Fecha mínima hace 100 años
   const maxDate = `${currentYear - 1}-12-31`; // Fecha máxima hasta el año pasado

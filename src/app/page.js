@@ -1,20 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { Typography, CircularProgress, Alert } from '@mui/material';
+import { Typography, CircularProgress, Alert, Snackbar } from '@mui/material';
 import { usePatients } from '../../lib/hooks/usePatients';
 import PatientTable from '@/components/PatientTable';
 import PaginationControl from '@/components/PaginationControl';
 import HomeActions from '@/components/HomeActions';
 import AddPatientModal from '@/components/AddPatientModal'; // Modal para agregar paciente
 import useSavePatient from '../../lib/hooks/useSavePatient';
+import { CheckCircleOutline } from '@mui/icons-material';
 
 export default function PatientManagement() {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false); // Estado del modal
-  const { patients, totalPages, loading, error } = usePatients(page, searchTerm);
-  const { savePatient, loading: saving, error: saveError } = useSavePatient(); 
+  const [showAlert, setShowAlert] = useState(false); // Estado para mostrar el alert
+  const { patients, totalPages, loading, error, refreshPatientsList } = usePatients(page, searchTerm); // Traemos `refreshPatientsList`
+  const { savePatient, loading: saving, error: saveError } = useSavePatient();
 
   const handlePageChange = (event, value) => {
     setPage(value);
@@ -29,10 +31,20 @@ export default function PatientManagement() {
   };
 
   const handleSavePatient = async (formData) => {
-    await savePatient(formData); // Llamar a la función del hook
+    // Llamar a la función del hook
+    await savePatient(formData);
     setIsModalOpen(false); // Cerrar el modal después de guardar
+    setShowAlert(true); // Mostrar el alert de éxito
+
+    // Actualizar la lista de pacientes
+    refreshPatientsList(); // Llamar a la función de actualización
+
+    // Cerrar el alert después de 3 segundos
+    setTimeout(() => {
+      setShowAlert(false);
+    }, 3000);
   };
-  
+
   return (
     <div className="min-h-screen">
       <Typography
@@ -54,7 +66,7 @@ export default function PatientManagement() {
           {loading && <CircularProgress />}
           {error && <Alert severity="error">{error}</Alert>}
           {!loading && !error && <PatientTable patients={patients} />}
-          
+
           <PaginationControl
             page={page}
             onPageChange={handlePageChange}
@@ -63,6 +75,14 @@ export default function PatientManagement() {
         </div>
       </main>
 
+      {/* Mostrar alert de éxito */}
+      <Snackbar open={showAlert} autoHideDuration={3000}>
+        <Alert icon={<CheckCircleOutline fontSize="inherit" />} severity="success">
+          Paciente agregado exitosamente.
+        </Alert>
+      </Snackbar>
+
+      {/* Modal para agregar paciente */}
       <AddPatientModal
         open={isModalOpen}
         onClose={handleCloseModal}
