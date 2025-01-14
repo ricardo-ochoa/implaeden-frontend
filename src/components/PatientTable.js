@@ -23,14 +23,14 @@ export default function PatientTable({ patients }) {
   };
 
   return (
-    <TableContainer component={Paper} elevation={1} sx={{ overflowX: 'auto', marginBottom: 4 }}>
+    <TableContainer component={Paper} elevation={1} sx={{ overflowX: 'auto', marginBottom: 2 }}>
       <Table sx={{ minWidth: 650 }}>
-        <TableHead>
+        <TableHead sx={{ backgroundColor: "#F1F1F5", paddingX: "10px" }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 600 }}>NOMBRE</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>TELÉFONO</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>EMAIL</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600 }}>
+            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>NOMBRE</TableCell>
+            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>TELÉFONO</TableCell>
+            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>EMAIL</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 600, padding: '10px' }}>
               HISTORIAL CLÍNICO
             </TableCell>
           </TableRow>
@@ -38,28 +38,28 @@ export default function PatientTable({ patients }) {
         <TableBody>
           {patients?.map((patient) => (
             <TableRow
-            key={patient.id}
-            hover
-            sx={{ cursor: 'pointer' }}
-            onClick={() => handleNavigateToDetails(patient.id)}
-          >
-            <TableCell>
-              <Box className="flex items-center gap-3">
-                <Avatar
-                  src={patient.foto_perfil_url || undefined}
-                  alt={`${patient.nombre} ${patient.apellidos}`}
-                  sx={{ cursor: 'pointer' }}
-                  onClick={(e) => {
-                    e.stopPropagation(); // Evita que se dispare el evento del TableRow
-                    handleNavigateToDetails(patient.id);
-                  }}
-                />
-                <Typography>{`${patient.nombre} ${patient.apellidos}`}</Typography>
-              </Box>
-            </TableCell>
-              <TableCell>{patient.telefono}</TableCell>
-              <TableCell>{patient.email}</TableCell>
-              <TableCell align="right">
+              key={patient.id}
+              hover
+              sx={{ cursor: 'pointer' }}
+              onClick={() => handleNavigateToDetails(patient.id)}
+            >
+              <TableCell sx={{ padding: '9px' }}>
+                <Box className="flex items-center gap-2">
+                  <Avatar
+                    src={patient.foto_perfil_url || undefined}
+                    alt={`${patient.nombre} ${patient.apellidos}`}
+                    sx={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Evita que se dispare el evento del TableRow
+                      handleNavigateToDetails(patient.id);
+                    }}
+                  />
+                  <Typography sx={{ fontWeight: 550 }}>{`${patient.nombre} ${patient.apellidos}`}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell sx={{ fontWeight: 550, fontSize: 14, padding: '8px' }}>{patient.telefono}</TableCell>
+              <TableCell sx={{ padding: '8px' }}>{patient.email}</TableCell>
+              <TableCell align="right" sx={{ padding: '8px' }}>
                 <IconButton size="small" color="default">
                   <Description fontSize="small" />
                 </IconButton>
