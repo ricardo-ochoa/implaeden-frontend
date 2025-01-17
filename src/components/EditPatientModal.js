@@ -57,7 +57,7 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
         fecha_nacimiento: data.fecha_nacimiento
           ? new Date(data.fecha_nacimiento).toISOString().split('T')[0]
           : null,
-        foto_perfil_url: data.foto_perfil_url || null,
+        eliminarFoto: data.foto_perfil_url === null ? 'true' : 'false',
       };
   
       await updatePatient(patient.id, normalizedData);

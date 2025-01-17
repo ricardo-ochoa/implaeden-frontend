@@ -1,18 +1,19 @@
 'use client';
 
+import React from 'react';
 import { Box, Button, TextField, useMediaQuery } from '@mui/material';
 import { Add } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
 export default function HomeActions({ searchTerm, setSearchTerm, onAddPatient }) {
-  const theme = useTheme(); // Obtener el tema para media queries
+  const theme = useTheme(); // Asegúrate de que ThemeProvider está envolviendo la app
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Detectar pantallas móviles
 
   return (
     <Box
       className="flex gap-4 mb-6 justify-between"
       sx={{
-        flexDirection:'row',
+        flexDirection: 'row',
       }}
     >
       <TextField
