@@ -16,8 +16,12 @@ export default function GeneralCard({ title, description, redirect }) {
       sx={{
         borderRadius: '10px',
         cursor: 'pointer',
+        border: '2px solid transparent', // Border default
+        transition: 'border-color 0.3s, box-shadow 0.3s', // Smooth transition
         '&:hover': {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+          border: '2px solid #B2C6FB',
+          backgroundColor: '#F5F7FB',
         },
       }}
       onClick={handleRedirect}

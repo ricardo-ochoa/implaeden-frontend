@@ -70,11 +70,12 @@ export default function PatientDetail({ params: paramsPromise }) {
           { label: `${patient.nombre} ${patient.apellidos}` },
         ]}
       />
-        <Box className="grid md:grid-cols-2 lg:grid-cols-2 mb-4">
+      <Box className="grid md:grid-cols-2 gap-4">
+        <Box className="grid md:grid-cols-1 lg:grid-cols-1">
             <BasicInfoCard patient={patient} />
         </Box>
 
-      <Box className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Box className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
 
         {cards.map((card, index) => (
           <GeneralCard
@@ -84,6 +85,7 @@ export default function PatientDetail({ params: paramsPromise }) {
             redirect={card.redirect}
           />
         ))}
+      </Box>
       </Box>
     </div>
   );

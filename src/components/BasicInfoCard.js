@@ -73,7 +73,7 @@ export default function BasicInfoCard({ patient }) {
               width: 100,
               height: 100,
               boxShadow: `
-                0 0 0 2px #FFFFFF, /* Borde blanco */
+                0 0 0 2px #F5F7FB, /* Borde blanco */
                 0 0 0 5px #B2C6FB   /* Borde azul */
               `,
             }}
