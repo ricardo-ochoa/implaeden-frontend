@@ -5,6 +5,7 @@ import { Card, CardContent, Typography, Avatar, Box, Snackbar, Alert, Button, Sk
 import { format, parseISO, differenceInYears } from 'date-fns';
 import EditPatientModal from './EditPatientModal';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
+import { Edit } from '@mui/icons-material';
 
 export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate }) {
   const [patient, setPatient] = useState(initialPatient);
@@ -131,6 +132,7 @@ export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate
               }}
               onClick={() => setIsModalOpen(true)}
               disabled={isLoading} // Deshabilitar si está cargando
+              startIcon={<Edit />}
             >
               Editar
             </Button>

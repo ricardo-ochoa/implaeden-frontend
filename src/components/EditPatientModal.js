@@ -98,6 +98,7 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
               <ProfilePictureUpload
                 onChange={(file) => field.onChange(file)}
                 currentImage={patient?.foto_perfil_url}
+                isEdit
               />
             )}
           />
