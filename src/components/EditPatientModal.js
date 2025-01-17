@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Modal,
   Box,
@@ -8,17 +8,16 @@ import {
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import ProfilePictureUpload from './ProfilePictureUpload';
-import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
+import useUpdatePatient from '../../lib/hooks/useUpdatePatient';
 
-export default function AddPatientModal({ open, onClose, onSave }) {
-  const currentYear = new Date().getFullYear(); // Año actual
-  const defaultAvatar = useRandomAvatar(); // Genera un avatar aleatorio si no hay imagen
+export default function EditPatientModal({ open, onClose, patient, onSuccess }) {
+  const currentYear = new Date().getFullYear();
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid },
     reset,
+    formState: { errors, isValid },
   } = useForm({
     mode: 'onChange',
     defaultValues: {
@@ -28,32 +27,49 @@ export default function AddPatientModal({ open, onClose, onSave }) {
       fecha_nacimiento: '',
       email: '',
       direccion: '',
-      foto: null,
+      foto_perfil_url: null,
     },
   });
 
-  const onSubmit = (data) => {
-    const formData = new FormData();
-    formData.append('nombre', data.nombre || '');
-    formData.append('apellidos', data.apellidos || '');
-    formData.append('telefono', data.telefono || '');
-    formData.append('fecha_nacimiento', data.fecha_nacimiento || '');
-    formData.append('email', data.email || '');
-    formData.append('direccion', data.direccion || '');
+  const { updatePatient, loading, error } = useUpdatePatient();
 
-    if (data.foto) {
-      formData.append('foto', data.foto);
-    } else {
-      // Si no hay foto cargada, usa el avatar predeterminado
-      formData.append('foto', defaultAvatar);
+
+  useEffect(() => {
+    if (patient) {
+      reset({
+        nombre: patient.nombre || '',
+        apellidos: patient.apellidos || '',
+        telefono: patient.telefono || '',
+        fecha_nacimiento: patient.fecha_nacimiento
+          ? new Date(patient.fecha_nacimiento).toISOString().split('T')[0]
+          : '',
+        email: patient.email || '',
+        direccion: patient.direccion || '',
+        foto_perfil_url: patient.foto_perfil_url || null,
+      });
     }
+  }, [patient, reset]);
 
-    onSave(formData); // Enviar el FormData
-    reset(); // Limpiar el formulario
-  };
+  const onSubmit = async (data) => {
+    try {
+      const normalizedData = {
+        ...data,
+        fecha_nacimiento: data.fecha_nacimiento
+          ? new Date(data.fecha_nacimiento).toISOString().split('T')[0]
+          : null,
+        foto_perfil_url: data.foto_perfil_url || null,
+      };
+  
+      await updatePatient(patient.id, normalizedData);
+      onSuccess(normalizedData); // Notifica al componente padre
+      onClose(); // Cierra el modal
+    } catch (err) {
+      console.error('Error al actualizar los datos:', err);
+    }
+  };   
 
-  const minDate = `${currentYear - 100}-01-01`; // Fecha mínima hace 100 años
-  const maxDate = `${currentYear - 1}-12-31`; // Fecha máxima hasta el año pasado
+  const minDate = `${currentYear - 100}-01-01`;
+  const maxDate = `${currentYear - 1}-12-31`;
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -71,16 +87,17 @@ export default function AddPatientModal({ open, onClose, onSave }) {
         }}
       >
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, textAlign: 'center' }}>
-          Agregar nuevo paciente
+          Editar Paciente
         </Typography>
+
         <form onSubmit={handleSubmit(onSubmit)}>
           <Controller
-            name="foto"
+            name="foto_perfil_url"
             control={control}
             render={({ field }) => (
               <ProfilePictureUpload
                 onChange={(file) => field.onChange(file)}
-                currentImage={defaultAvatar} // Pasar el avatar predeterminado
+                currentImage={patient?.foto_perfil_url}
               />
             )}
           />
@@ -89,12 +106,12 @@ export default function AddPatientModal({ open, onClose, onSave }) {
             name="nombre"
             control={control}
             rules={{
-              required: 'El nombre es obligatorio.',
-              pattern: {
-                value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
-                message: 'El nombre solo puede contener letras y espacios.',
-              },
-            }}
+                required: 'Este campo es obligatorio.',
+                pattern: {
+                  value: /^[A-Za-z ]+$/,
+                  message: 'Solo se permiten letras y espacios.',
+                },
+              }}
             render={({ field }) => (
               <TextField
                 {...field}
@@ -135,8 +152,8 @@ export default function AddPatientModal({ open, onClose, onSave }) {
             rules={{
               required: 'El teléfono es obligatorio.',
               pattern: {
-                value: /^[0-9]+$/,
-                message: 'El teléfono solo puede contener números.',
+                value: /^[0-9]{10}$/,
+                message: 'El teléfono debe tener exactamente 10 dígitos.',
               },
             }}
             render={({ field }) => (
@@ -158,12 +175,12 @@ export default function AddPatientModal({ open, onClose, onSave }) {
               required: 'La fecha de nacimiento es obligatoria.',
               validate: (value) => {
                 const selectedDate = new Date(value);
-                const minDate = new Date(currentYear - 100, 0, 1);
-                const maxDate = new Date(currentYear - 1, 11, 31);
+                const min = new Date(minDate);
+                const max = new Date(maxDate);
                 return (
-                  selectedDate >= minDate &&
-                  selectedDate <= maxDate
-                ) || 'La fecha debe estar entre hace 100 años y el año pasado.';
+                  selectedDate >= min &&
+                  selectedDate <= max
+                ) || `La fecha debe estar entre ${minDate} y ${maxDate}.`;
               },
             }}
             render={({ field }) => (
@@ -227,23 +244,27 @@ export default function AddPatientModal({ open, onClose, onSave }) {
             )}
           />
 
+          {error && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {error}
+            </Typography>
+          )}
+
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, gap: 2 }}>
             <Button
               variant="outlined"
               color="secondary"
-              onClick={() => {
-                reset();
-                onClose();
-              }}
+              onClick={onClose}
+              disabled={loading}
             >
               Cancelar
             </Button>
             <Button
-              fullWidth
+            fullWidth
               type="submit"
               variant="contained"
               color="primary"
-              disabled={!isValid}
+              disabled={!isValid || loading}
             >
               Guardar
             </Button>
