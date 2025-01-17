@@ -6,6 +6,7 @@ import { format, parseISO, differenceInYears } from 'date-fns';
 import EditPatientModal from './EditPatientModal';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
 import { Edit } from '@mui/icons-material';
+import ImageDetailModal from './ImageDetailModal';
 
 export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate }) {
   const [patient, setPatient] = useState(initialPatient);
@@ -13,8 +14,13 @@ export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialPatient); // Estado para manejar el loading
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const defaultAvatar = useRandomAvatar(); // Genera un avatar aleatorio si no hay imagen
 
+
+const handleAvatarClick = () => {
+  setIsImageModalOpen(true);
+};
   // Sincronizar el estado local con los cambios en initialPatient
   useEffect(() => {
     if (initialPatient) {
@@ -109,18 +115,20 @@ export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate
             {isLoading ? (
               <Skeleton variant="circular" width={100} height={100} />
             ) : (
-              <Avatar
-                src={avatarUrl}
-                alt={`${patient?.nombre} ${patient?.apellidos}`}
-                sx={{
-                  width: 100,
-                  height: 100,
-                  boxShadow: `
-                    0 0 0 2px #F5F7FB,
-                    0 0 0 5px #B2C6FB
-                  `,
-                }}
-              />
+                <Avatar
+                  src={avatarUrl}
+                  alt={`${patient?.nombre} ${patient?.apellidos}`}
+                  onClick={handleAvatarClick}
+                  sx={{
+                    width: 100,
+                    height: 100,
+                    boxShadow: `
+                      0 0 0 2px #F5F7FB,
+                      0 0 0 5px #B2C6FB
+                    `,
+                    cursor: 'pointer',
+                  }}
+                />
             )}
             <Button
               variant="outlined"
@@ -207,6 +215,13 @@ export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate
         onClose={handleModalClose}
         patient={patient}
         onSuccess={handleUpdateSuccess}
+      />
+
+      <ImageDetailModal
+        open={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        imageUrl={avatarUrl}
+        altText={`${patient?.nombre} ${patient?.apellidos}`}
       />
     </>
   );
