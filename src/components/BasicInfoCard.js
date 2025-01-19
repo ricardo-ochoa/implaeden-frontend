@@ -7,6 +7,7 @@ import EditPatientModal from './EditPatientModal';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
 import { Edit } from '@mui/icons-material';
 import ImageDetailModal from './ImageDetailModal';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate }) {
   const [patient, setPatient] = useState(initialPatient);
@@ -174,6 +175,7 @@ const handleAvatarClick = () => {
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {detail.label}:
                     </Typography>
+                  
                     <Typography
                       variant="body2"
                       sx={{
@@ -189,6 +191,9 @@ const handleAvatarClick = () => {
                       }}
                       onClick={detail.onClick}
                     >
+                      {
+                      detail.onClick && (<ContentCopyIcon size="small" onClick={detail.onClick} sx={{ marginRight: 1, width: "18px"}} />)
+                    }
                       {detail.value || 'N/A'}
                     </Typography>
                   </Box>
