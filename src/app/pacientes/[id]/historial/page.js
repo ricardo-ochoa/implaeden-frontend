@@ -1,29 +1,34 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
-
 import { use, useEffect, useState } from 'react';
-import { Avatar, Box, Button, Modal, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+} from '@mui/material';
 import SectionTitle from '@/components/SectionTitle';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import 'lightgallery/css/lightgallery.css';
 import LightGallery from 'lightgallery/react';
-import useClinicalHistories from '../../../../../lib/hooks/useClinicalHistories';
+import 'lightgallery/css/lightgallery.css';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-import FileUploadComponent from '@/components/FileUploadComponent';
+import useClinicalHistories from '../../../../../lib/hooks/useClinicalHistories';
+import UploadFilesModal from '@/components/UploadFilesModal';
+import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
 
 export default function PatientDetail({ params: paramsPromise }) {
   const params = use(paramsPromise);
   const { id } = params;
-
   const { clinicalRecords, loading, fetchClinicalHistories } = useClinicalHistories(id);
 
   const [patient, setPatient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [error, setError] = useState(null);
   const [newRecordDate, setNewRecordDate] = useState('');
   const [newRecordFiles, setNewRecordFiles] = useState([]);
-  const [pdfToPreview, setPdfToPreview] = useState(null);
+  const defaultAvatar = useRandomAvatar();
 
   useEffect(() => {
     fetchClinicalHistories();
@@ -47,32 +52,11 @@ export default function PatientDetail({ params: paramsPromise }) {
   }, [id]);
 
   const groupedRecords = clinicalRecords.reduce((acc, record) => {
-    const date = record.record_date.split('T')[0]; // Extraer solo la fecha (YYYY-MM-DD)
+    const date = record.record_date.split('T')[0];
     if (!acc[date]) acc[date] = [];
     acc[date].push(record);
     return acc;
   }, {});
-
-  const renderPdf = async (url) => {
-    try {
-      const canvas = document.getElementById('pdfCanvas');
-      const pdf = await getDocument(url).promise;
-      const page = await pdf.getPage(1); // Muestra la primera página
-      const context = canvas.getContext('2d');
-      const viewport = page.getViewport({ scale: 1.5 });
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      await page.render({
-        canvasContext: context,
-        viewport: viewport,
-      }).promise;
-    } catch (err) {
-      console.error('Error al renderizar el PDF:', err);
-      setError('No se pudo cargar el PDF. Verifique el archivo.');
-    }
-  };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -88,7 +72,7 @@ export default function PatientDetail({ params: paramsPromise }) {
 
     const formData = new FormData();
     formData.append('record_date', newRecordDate);
-    newRecordFiles.forEach((file) => formData.append('files', file)); // El nombre debe ser "files"
+    newRecordFiles.forEach((file) => formData.append('files', file));
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clinical-histories/${id}`, {
@@ -97,20 +81,23 @@ export default function PatientDetail({ params: paramsPromise }) {
       });
 
       if (!response.ok) throw new Error('Error al guardar el historial clínico.');
-      const result = await response.json();
+
+      await response.json();
       fetchClinicalHistories();
-      setIsModalOpen(false);
-      setNewRecordDate('');
-      setNewRecordFiles([]);
+      handleCloseModal();
     } catch (err) {
       console.error('Error al guardar el historial clínico:', err);
       alert('Error al guardar el historial clínico.');
     }
   };
-  
 
   const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
 
+  const avatarUrl = patient?.foto_perfil_url
+  ? `${patient.foto_perfil_url}`
+  : defaultAvatar;
+
+  const existRecords = clinicalRecords.length > 0;
   return (
     <div className="container mx-auto max-w-screen-lg px-4 py-8">
       {loading ? (
@@ -129,151 +116,115 @@ export default function PatientDetail({ params: paramsPromise }) {
       )}
 
       <Box className="grid gap-4">
-        <Typography variant="h6">Historiales clínicos registrados:</Typography>
+        {
+          existRecords ? (
+            <Typography variant="h6">Historiales clínicos registrados:</Typography>
+          ) : (
+            <Typography variant="h6">No hay historiales registrados:</Typography>
+          )
+        }
 
-        {clinicalRecords.length > 0 && (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><strong>Paciente</strong></TableCell>
-                  <TableCell><strong>Fecha</strong></TableCell>
-                  <TableCell><strong>Evidencias</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {Object.entries(groupedRecords).map(([date, records]) => (
-                  <TableRow key={date}>
-                    <TableCell sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar src={patient?.foto_perfil_url} alt="Paciente" />
-                      {patientName}
-                    </TableCell>
-                    <TableCell>{date}</TableCell>
-                    <TableCell>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {/* PDFs outside LightGallery */}
-                        {records
-                          .filter((record) => record.file_url.endsWith('.pdf'))
-                          .map((record, index) => (
-                            <a key={index} href={record.file_url} target="_blank" rel="noopener noreferrer">
-                              <PictureAsPdfIcon
-                                sx={{
-                                  fontSize: 50,
-                                  cursor: 'pointer',
-                                  color: 'primary.main',
-                                }}
-                              />
-                            </a>
-                          ))}
-
-                        {/* Images inside LightGallery */}
-                        <LightGallery
-  selector="a"
-  download={false} // Disable download if you don't need it
->
-  <div
-    style={{
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '8px', // Space between images
-    }}
-  >
-    {records
-      .filter((record) => !record.file_url.endsWith('.pdf'))
-      .map((record, index) => (
-        <a
-          key={index}
-          data-src={record.file_url} // Ensure data-src is present
-          href={record.file_url} // Fallback for LightGallery
-          style={{ display: 'inline-block' }} // Inline-block for proper spacing
-        >
-          <img
-            src={record.file_url}
-            alt="Evidencia"
-            style={{
-              maxWidth: '50px',
-              maxHeight: '50px',
+        <Box display="flex" flexWrap="wrap" gap={2}>
+          {Object.entries(groupedRecords).map(([date, records]) => (
+            <Card key={date}
+            sx={{
+              borderRadius: '10px',
+              width: { xs: '100%', md: '40%', lg: 300 },
               cursor: 'pointer',
-              borderRadius: '4px',
-            }}
-          />
-        </a>
-      ))}
-  </div>
-</LightGallery>
+              border: '2px solid transparent', // Border default
+              transition: 'border-color 0.3s, box-shadow 0.3s', // Smooth transition
+              '&:hover': {
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                border: '2px solid #B2C6FB',
+                backgroundColor: '#F5F7FB',
+              },
+            }}>
+              <CardContent>
+                <Box display="flex" alignItems="center" gap={2} mb={2}>
+                  <Avatar src={avatarUrl} alt="Paciente" />
+                  <Typography variant="body1" fontWeight="bold">
+                    {patientName}
+                  </Typography>
+                </Box>
+                <Box display={"flex"}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1}}>
+                    Fecha:
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {date}
+                  </Typography>
+                </Box>
+                <Box mt={2}>
+                  {records
+                    .filter((record) => record.file_url.endsWith('.pdf'))
+                    .map((record, index) => (
+                      <a
+                        key={index}
+                        href={record.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <PictureAsPdfIcon
+                          sx={{
+                            fontSize: 40,
+                            cursor: 'pointer',
+                            color: 'primary.main',
+                            marginRight: '8px',
+                          }}
+                        />
+                      </a>
+                    ))}
 
+                  <LightGallery selector="a" download={false}>
+                    <Box display="flex" flexWrap="wrap" gap={1}>
+                      {records
+                        .filter((record) => !record.file_url.endsWith('.pdf'))
+                        .map((record, index) => (
+                          <a
+                            key={index}
+                            data-src={record.file_url}
+                            href={record.file_url}
+                          >
+                            <CardMedia
+                              component="img"
+                              image={record.file_url}
+                              alt="Evidencia"
+                              sx={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                            />
+                          </a>
+                        ))}
+                    </Box>
+                  </LightGallery>
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
 
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-
-        <Button variant="outlined" onClick={() => setIsModalOpen(true)} startIcon={<UploadFileIcon />}>
-          Agregar nuevo historial
-        </Button>
+          <Button
+            sx={{ width: { xs: '100%', md: '40%', lg: 300 } }}
+            variant="outlined"
+            onClick={() => setIsModalOpen(true)}
+            startIcon={<UploadFileIcon />}
+          >
+            Agregar nuevo historial
+          </Button>
+        </Box>
       </Box>
 
- {/* Modal para subir archivos */}
- <Modal
+      <UploadFilesModal
         open={isModalOpen}
         onClose={handleCloseModal}
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Box
-          sx={{
-            maxWidth: '900px',
-            width: '90%',
-            maxHeight: '90%',
-            overflowY: 'auto',
-            bgcolor: 'background.paper',
-            p: 4,
-            borderRadius: 2,
-          }}
-        >
-          <Typography
-            id="modal-title"
-            variant="h6"
-            gutterBottom
-            sx={{ fontWeight: 'bold', mb: 2 }}
-          >
-            Nuevo historial clínico:
-          </Typography>
-          <Typography variant="subtitle2" sx={{ fontWeight: '550' }}>
-            Fecha de registro:
-          </Typography>
-          <TextField
-            placeholder="Fecha del registro"
-            type="date"
-            fullWidth
-            value={newRecordDate}
-            onChange={(e) => setNewRecordDate(e.target.value)}
-            sx={{ marginBottom: 2 }}
-          />
-          <FileUploadComponent
-            onFileUpload={(files) => setNewRecordFiles(files)}
-          />
-          <Box
-            sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}
-          >
-            <Button variant="outlined" onClick={handleCloseModal}>
-              Cancelar
-            </Button>
-            <Button variant="contained" onClick={handleSaveRecord} size="large" fullWidth sx={{ maxWidth: '300px' }}>
-              Guardar
-            </Button>
-          </Box>
-        </Box>
-      </Modal>
+        title="Nuevo historial clínico:"
+        newRecordDate={newRecordDate}
+        setNewRecordDate={setNewRecordDate}
+        setNewRecordFiles={setNewRecordFiles}
+        handleSaveRecord={handleSaveRecord}
+      />
     </div>
   );
 }
