@@ -182,6 +182,9 @@ export default function PatientDetail({ params: paramsPromise }) {
                     <MoreVertIcon />
                   </IconButton>
                 </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
+                    Historial Clínico
+                  </Typography>
                 <Box display="flex">
                   <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
                     Fecha:
@@ -230,6 +233,11 @@ export default function PatientDetail({ params: paramsPromise }) {
                                 height: 50,
                                 borderRadius: '4px',
                                 cursor: 'pointer',
+                                transition: 'border-color 0.3s, box-shadow 0.3s',
+                                '&:hover': {
+                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                                  cursor: 'pointer',
+                                },
                               }}
                             />
                           </a>
