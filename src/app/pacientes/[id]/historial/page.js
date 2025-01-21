@@ -26,6 +26,7 @@ import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import ShareIcon from '@mui/icons-material/Share';
 import useDeleteClinicalHistory from '../../../../../lib/hooks/useDeleteClinicalHistory';
+import { formatDate } from '../../../../../lib/utils/formatDate';
 
 export default function PatientDetail({ params: paramsPromise }) {
   const params = use(paramsPromise);
@@ -190,7 +191,7 @@ export default function PatientDetail({ params: paramsPromise }) {
                     Fecha:
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {date}
+                    {formatDate(date)}
                   </Typography>
                 </Box>
                 <Box mt={2}>

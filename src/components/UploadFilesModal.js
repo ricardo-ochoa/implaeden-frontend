@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -17,6 +17,10 @@ const UploadFilesModal = ({
   setNewRecordFiles,
   handleSaveRecord
 }) => {
+  const [filesUploaded, setFilesUploaded] = useState([]);
+
+  const isSaveDisabled = !newRecordDate || filesUploaded.length === 0;
+
   return (
     <Modal
       open={open}
@@ -54,7 +58,10 @@ const UploadFilesModal = ({
           onChange={(e) => setNewRecordDate(e.target.value)}
           sx={{ marginBottom: 2 }}
         />
-        <FileUploadComponent onFileUpload={(files) => setNewRecordFiles(files)} />
+        <FileUploadComponent onFileUpload={(files) => {
+          setNewRecordFiles(files);
+          setFilesUploaded(files);
+        }} />
         <Box
           sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}
         >
@@ -67,6 +74,7 @@ const UploadFilesModal = ({
             size="large"
             fullWidth
             sx={{ maxWidth: '300px' }}
+            disabled={isSaveDisabled}
           >
             Guardar
           </Button>
