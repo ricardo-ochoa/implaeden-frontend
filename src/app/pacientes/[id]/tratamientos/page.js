@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 import { use, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -23,10 +24,10 @@ import TreatmentCard from '@/components/TreatmentCard';
 
 
 export default function Tratamientos({ params: paramsPromise }) {
+  const router = useRouter();
   const params = use(paramsPromise);
   const { id } = params;
   const { treatments, loading, fetchPatientTreatments, deleteTreatment } = usePatientTreatments(id);
-
   const [patient, setPatient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -63,8 +64,6 @@ export default function Tratamientos({ params: paramsPromise }) {
       setSnackbarOpen(true);
     }
   };
-  
-  
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -134,6 +133,10 @@ export default function Tratamientos({ params: paramsPromise }) {
 
   const existRecords = treatments.length > 0;
 
+  const handleCardClick = (treatmentId) => {
+    router.push(`/pacientes/${id}/tratamientos/${treatmentId}`);
+  };
+
   return (
     <div className="container mx-auto max-w-screen-lg px-4 py-8">
       {loading ? (
@@ -164,6 +167,7 @@ export default function Tratamientos({ params: paramsPromise }) {
               key={treatment.treatment_id}
               treatment={treatment}
               onMenuOpen={handleMenuOpen}
+              onClick={() => handleCardClick(treatment.treatment_id)}
             />
           ))}
 

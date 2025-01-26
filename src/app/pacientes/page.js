@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Typography, CircularProgress, Alert, Snackbar } from '@mui/material';
+import { PatientProvider, usePatient } from '@/context/PatientContext';
 
 import PatientTable from '@/components/PatientTable';
 import PaginationControl from '@/components/PaginationControl';
@@ -18,6 +19,7 @@ export default function PatientManagement() {
   const [showAlert, setShowAlert] = useState(false); // Estado para mostrar el alert
   const { savePatient, loading: saving, error: saveError } = useSavePatient();
   const { patients, totalPages, loading, error, refreshPatientsList } = usePatients(page, searchTerm);
+  
   const handlePageChange = (event, value) => {
     setPage(value);
   };
@@ -46,48 +48,50 @@ export default function PatientManagement() {
   };
 
   return (
-    <div className="">
-      <Typography
-        variant="h4"
-        component="h1"
-        sx={{ fontWeight: 600, marginTop: 4, marginLeft: 4 }}
-      >
-        Pacientes
-      </Typography>
+    <PatientProvider>
+      <div className="">
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{ fontWeight: 600, marginTop: 4, marginLeft: 4 }}
+        >
+          Pacientes
+        </Typography>
 
-      <main>
-        <div className="container mx-auto max-w-screen-lg px-4 py-8">
-          <HomeActions
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm} // Actualiza el término de búsqueda
-            onAddPatient={handleAddPatient}
-          />
+        <main>
+          <div className="container mx-auto max-w-screen-lg px-4 py-8">
+            <HomeActions
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm} // Actualiza el término de búsqueda
+              onAddPatient={handleAddPatient}
+            />
 
-          {loading && <CircularProgress />}
-          {error && <Alert severity="error">{error}</Alert>}
-          {!loading && !error && <PatientTable patients={patients} />}
+            {loading && <CircularProgress />}
+            {error && <Alert severity="error">{error}</Alert>}
+            {!loading && !error && <PatientTable patients={patients} />}
 
-          <PaginationControl
-            page={page}
-            onPageChange={handlePageChange}
-            totalPages={totalPages}
-          />
-        </div>
-      </main>
+            <PaginationControl
+              page={page}
+              onPageChange={handlePageChange}
+              totalPages={totalPages}
+            />
+          </div>
+        </main>
 
-      {/* Mostrar alert de éxito */}
-      <Snackbar open={showAlert} autoHideDuration={3000}>
-        <Alert icon={<CheckCircleOutline fontSize="inherit" />} severity="success">
-          Paciente agregado exitosamente.
-        </Alert>
-      </Snackbar>
+        {/* Mostrar alert de éxito */}
+        <Snackbar open={showAlert} autoHideDuration={3000}>
+          <Alert icon={<CheckCircleOutline fontSize="inherit" />} severity="success">
+            Paciente agregado exitosamente.
+          </Alert>
+        </Snackbar>
 
-      {/* Modal para agregar paciente */}
-      <AddPatientModal
-        open={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSavePatient}
-      />
-    </div>
+        {/* Modal para agregar paciente */}
+        <AddPatientModal
+          open={isModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSavePatient}
+        />
+      </div>
+    </PatientProvider>
   );
 }

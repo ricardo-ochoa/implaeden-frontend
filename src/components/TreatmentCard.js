@@ -10,7 +10,7 @@ import {
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { formatDate } from '../../lib/utils/formatDate';
 
-const TreatmentCard = ({ treatment, onMenuOpen }) => {
+const TreatmentCard = ({ treatment, onMenuOpen, onClick }) => {
   return (
     <Card
       sx={{
@@ -26,7 +26,7 @@ const TreatmentCard = ({ treatment, onMenuOpen }) => {
         },
       }}
     >
-      <CardContent>
+      <CardContent onClick={onClick}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Box display="flex" alignItems="center" gap={2}>
             <Typography variant="body1" fontWeight="bold">

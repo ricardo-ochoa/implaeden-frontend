@@ -4,7 +4,7 @@ import { Box, Button, Typography, Breadcrumbs, Link } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 
-export default function SectionTitle({ breadcrumbs, title }) {
+export default function SectionTitle({ breadcrumbs = [], title }) {
   const router = useRouter();
 
   const handleBack = () => {
