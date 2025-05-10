@@ -35,7 +35,7 @@ export default function GeneralCard({ title, description, redirect }) {
             <ArrowForwardIosIcon fontSize="small" />
           </IconButton>
         </Box>
-        <Typography variant="body2" sx={{ marginTop: '8px', color: 'gray' }}>
+        <Typography variant="body2" fontWeight={550} sx={{ marginTop: '8px' }}>
           {description}
         </Typography>
       </CardContent>

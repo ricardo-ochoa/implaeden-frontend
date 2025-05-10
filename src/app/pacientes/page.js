@@ -49,7 +49,7 @@ export default function PatientManagement() {
 
   return (
     <PatientProvider>
-      <div className="">
+      <div>
         <Typography
           variant="h4"
           component="h1"

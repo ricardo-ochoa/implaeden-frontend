@@ -29,6 +29,7 @@ export default function HomeActions({ searchTerm, setSearchTerm, onAddPatient })
         variant="contained"
         startIcon={<Add />}
         className="whitespace-nowrap max-w-[240px]"
+        style={{fontWeight: 550}}
         onClick={onAddPatient}
       >
         {isMobile ? 'Nuevo' : 'Agregar nuevo paciente'}

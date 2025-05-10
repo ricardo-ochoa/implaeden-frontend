@@ -72,13 +72,13 @@ export default function PatientTable({ patients = [] }) {
                   </Typography>
                 </Box>
               </TableCell>
-              <TableCell sx={{ fontWeight: 550, fontSize: 14, padding: '8px' }}>
+              <TableCell sx={{ typography: 'body1',fontWeight: 550, padding: '8px' }}>
                 {patient.telefono || 'N/A'}
               </TableCell>
-              <TableCell sx={{ padding: '8px' }}>
+              <TableCell sx={{ padding: '8px', typography: 'body1', fontWeight: 550 }}>
                 {patient.email || 'N/A'}
               </TableCell>
-              <TableCell align="right" sx={{ padding: '8px' }}>
+              <TableCell align="right" sx={{ padding: '8px'  }}>
                 <IconButton
                   size="small"
                   color="default"

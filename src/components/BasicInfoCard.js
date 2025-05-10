@@ -160,7 +160,7 @@ const handleAvatarClick = () => {
               </>
             ) : (
               <>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                <Typography variant="h6" color='primary' sx={{ fontWeight: 600, mb: 1 }}>
                   {`${patient?.nombre} ${patient?.apellidos}`}
                 </Typography>
                 {patientDetails.map((detail, index) => (
@@ -172,7 +172,7 @@ const handleAvatarClick = () => {
                       mb: 1,
                     }}
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 550 }}>
                       {detail.label}:
                     </Typography>
                   
