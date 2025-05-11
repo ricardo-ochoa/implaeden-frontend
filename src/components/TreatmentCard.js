@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Avatar,
   Box,
@@ -6,11 +6,27 @@ import {
   CardContent,
   Typography,
   IconButton,
+  Chip,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
 import { formatDate } from '../../lib/utils/formatDate';
 
-const TreatmentCard = ({ treatment, onMenuOpen, onClick }) => {
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'Terminado':
+      return 'success';
+    case 'En proceso':
+      return 'warning';
+    case 'Por Iniciar':
+    default:
+      return 'default';
+  }
+};
+
+const TreatmentCard = ({ treatment, onMenuOpen, onClick, onStatusClick }) => {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <Card
       sx={{
@@ -26,26 +42,64 @@ const TreatmentCard = ({ treatment, onMenuOpen, onClick }) => {
         },
       }}
     >
-      <CardContent onClick={onClick}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Typography variant="body1" fontWeight="bold">
-              {treatment.service_name}
-            </Typography>
+      <CardContent onClick={onClick} sx={{ position: 'relative' }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+          <Box
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+          >
+            <Chip
+              label={
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <span>{treatment.status || 'Sin estado'}</span>
+                  {hovered && <EditIcon sx={{ fontSize: 16 }} />}
+                </Box>
+              }
+              color={getStatusColor(treatment.status)}
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStatusClick?.(treatment);
+              }}
+              sx={(theme) => ({
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                borderWidth: 2,
+                borderStyle: 'solid',
+                borderColor: theme.palette[getStatusColor(treatment.status)]?.main || '#ccc',
+                '&:hover': {
+                  boxShadow: `0 0 6px ${theme.palette[getStatusColor(treatment.status)]?.main || '#888'}`,
+                },
+              })}
+            />
           </Box>
-          <IconButton onClick={(e) => onMenuOpen(e, treatment)}>
+
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenuOpen(e, treatment);
+            }}
+          >
             <MoreVertIcon />
           </IconButton>
         </Box>
+
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Typography variant="body1" fontWeight="bold">
+            {treatment.service_name}
+          </Typography>
+        </Box>
+
         <Typography variant="body2" sx={{ marginRight: 1 }}>
-          <span className='font-semibold'>Categoría: </span> {treatment.service_category}
+          <span className="font-semibold">Categoría: </span> {treatment.service_category}
         </Typography>
-        <Box display="flex" mt={2}>
+
+        <Box display="flex" mt={1}>
           <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
             Fecha:
           </Typography>
           <Typography variant="body2" color="text.secondary">
-          {formatDate(treatment.service_date)}
+            {formatDate(treatment.service_date)}
           </Typography>
         </Box>
       </CardContent>

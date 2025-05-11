@@ -21,6 +21,7 @@ import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocum
 import SectionTitle from '@/components/SectionTitle';
 import { useParams } from 'next/navigation';
 import { usePatient } from '@/context/PatientContext';
+import usePatientTreatments from '../../../../../../lib/hooks/usePatientTreatments';
 
 const DOCUMENT_TYPES = [
   { type: 'budget', label: 'Presupuesto' },
@@ -31,6 +32,7 @@ const DOCUMENT_TYPES = [
 export default function TreatmentDetail() {
   const { id, treatmentId } = useParams();
   const { patient, setPatient } = usePatient();
+  const { treatments } = usePatientTreatments(id);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
   const [newRecordDate, setNewRecordDate] = useState('');
@@ -38,6 +40,7 @@ export default function TreatmentDetail() {
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const { documents, loading, error, createDocument, deleteDocument, fetchDocuments } =
     useTreatmentDocuments(treatmentId);
+    const [treatment, setTreatment] = useState(null);
 
   useEffect(() => {
     if (!id) {
@@ -64,6 +67,13 @@ export default function TreatmentDetail() {
       fetchPatient();
     }
   }, [id, patient, setPatient]);
+
+  useEffect(() => {
+    if (!treatmentId || !treatments.length) return;
+  
+    const current = treatments.find(t => t.treatment_id === parseInt(treatmentId));
+    setTreatment(current);
+  }, [treatmentId, treatments]);  
 
   const handleOpenModal = (type) => {
     setSelectedDocumentType(type);
@@ -229,13 +239,14 @@ const renderCard = (type, label) => {
   return (
     <div className="container mx-auto max-w-screen-lg px-4 py-8">
       <SectionTitle
-        title={`${patient?.nombre || 'Cargando...'} - Tratamiento`}
+        title={`${patient?.nombre || 'Cargando...'} - ${treatment?.service_name || 'Tratamiento'}`}
         breadcrumbs={[
           { label: 'Pacientes', href: '/pacientes' },
           { label: patient?.nombre || '', href: `/pacientes/${id}` },
-          { label: 'Historial clínico', href: `/pacientes/${id}/historial` },
+          { label: 'Tratamientos', href: `/pacientes/${id}/tratamientos` },
         ]}
       />
+
       {loading && <CircularProgress />}
       {error && <Alert severity="error">{error}</Alert>}
       <Box display="flex" gap={2} flexWrap="wrap">

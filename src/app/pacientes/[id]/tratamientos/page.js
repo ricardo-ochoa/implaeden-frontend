@@ -21,6 +21,7 @@ import ShareIcon from '@mui/icons-material/Share';
 import ModalServicio from '@/components/ModalServicio';
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments';
 import TreatmentCard from '@/components/TreatmentCard';
+import UpdateStatusModal from '@/components/UpdateStatusModal';
 
 
 export default function Tratamientos({ params: paramsPromise }) {
@@ -40,6 +41,10 @@ export default function Tratamientos({ params: paramsPromise }) {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedTreatment, setSelectedTreatment] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+
   const defaultAvatar = useRandomAvatar();
 
   const handleDeleteRecord = async () => {
@@ -125,6 +130,40 @@ export default function Tratamientos({ params: paramsPromise }) {
     }
   };
 
+  const handleStatusClick = (treatment) => {
+    setSelectedTreatment(treatment);
+    setNewStatus(treatment.status || '');
+    setStatusModalOpen(true);
+  };
+
+  const handleSaveStatus = async () => {
+    if (!selectedTreatment?.treatment_id || !newStatus) return;
+  
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/tratamientos/${selectedTreatment.treatment_id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+  
+      if (!res.ok) throw new Error('Error al actualizar el estado');
+  
+      setStatusModalOpen(false);
+      setSelectedTreatment(null);
+      setNewStatus('');
+      fetchPatientTreatments(); // refrescar
+      setSnackbarMessage('Estado actualizado correctamente.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error(err);
+      setSnackbarMessage('Error al actualizar el estado.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    }
+  };
+  
+
   const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
 
   const avatarUrl = patient?.foto_perfil_url
@@ -145,7 +184,7 @@ export default function Tratamientos({ params: paramsPromise }) {
         </Typography>
       ) : (
         <SectionTitle
-          title={`${patientName} - Tratamientos`}
+          title={`Tratamientos - ${patientName}`}
           breadcrumbs={[
             { label: 'Pacientes', href: '/pacientes' },
             { label: patientName, href: `/pacientes/${id}` },
@@ -163,11 +202,12 @@ export default function Tratamientos({ params: paramsPromise }) {
 
         <Box display="flex" flexWrap="wrap" gap={2}>
           { treatments.map((treatment, index) => (
-              <TreatmentCard
+            <TreatmentCard
               key={treatment.treatment_id}
               treatment={treatment}
               onMenuOpen={handleMenuOpen}
               onClick={() => handleCardClick(treatment.treatment_id)}
+              onStatusClick={handleStatusClick}
             />
           ))}
 
@@ -187,7 +227,7 @@ export default function Tratamientos({ params: paramsPromise }) {
         open={Boolean(menuAnchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => {}}> <ShareIcon sx={{ mr: 1}} color='info'/> Compartir</MenuItem>
+        {/* <MenuItem onClick={() => {}}> <ShareIcon sx={{ mr: 1}} color='info'/> Compartir</MenuItem> */}
         <MenuItem
           onClick={() => {
             setRecordToDelete(menuRecord);
@@ -219,6 +259,15 @@ export default function Tratamientos({ params: paramsPromise }) {
         title="Eliminar el tratamiento"
         description="¿Estás seguro de que quieres eliminar este tratamiento? Esta acción no se puede deshacer."
         onConfirm={handleDeleteRecord}
+      />
+
+      <UpdateStatusModal
+        open={statusModalOpen}
+        onClose={() => setStatusModalOpen(false)}
+        treatment={selectedTreatment}
+        newStatus={newStatus}
+        setNewStatus={setNewStatus}
+        onSave={handleSaveStatus}
       />
 
       <Snackbar
