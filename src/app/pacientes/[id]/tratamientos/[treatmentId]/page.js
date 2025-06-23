@@ -10,9 +10,8 @@ import {
   CircularProgress,
   Alert,
   IconButton,
+  Modal,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import LightGallery from 'lightgallery/react';
 import 'lightgallery/css/lightgallery.css';
@@ -22,6 +21,9 @@ import SectionTitle from '@/components/SectionTitle';
 import { useParams } from 'next/navigation';
 import { usePatient } from '@/context/PatientContext';
 import usePatientTreatments from '../../../../../../lib/hooks/usePatientTreatments';
+import CloseIcon from '@mui/icons-material/Close';
+import FilePreviewModal from '@/components/FilePreviewModal';
+import { formatDate } from '../../../../../../lib/utils/formatDate';
 
 const DOCUMENT_TYPES = [
   { type: 'budget', label: 'Presupuesto' },
@@ -40,7 +42,10 @@ export default function TreatmentDetail() {
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
   const { documents, loading, error, createDocument, deleteDocument, fetchDocuments } =
     useTreatmentDocuments(treatmentId);
-    const [treatment, setTreatment] = useState(null);
+  const [treatment, setTreatment] = useState(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
+
 
   useEffect(() => {
     if (!id) {
@@ -151,90 +156,125 @@ export default function TreatmentDetail() {
     }
   };  
   
-
-const renderCard = (type, label) => {
-  const filteredDocuments = documents.filter((doc) => doc.document_type === type);
-
-  return (
-    <Card
-      key={type}
-      sx={{
-        borderRadius: '10px',
-        width: { xs: '100%', md: '40%', lg: 300 },
-        cursor: 'pointer',
-        border: '2px solid transparent',
-        '&:hover': {
-          border: '2px solid #B2C6FB',
-        },
-      }}
-    >
-      <CardContent>
-        <Typography fontWeight="bold">{label}</Typography>
-        {filteredDocuments.length > 0 ? (
-          <LightGallery selector="a" download={false}>
+  const renderCard = (type, label) => {
+    const filteredDocuments = documents.filter((doc) => doc.document_type === type);
+  
+    return (
+      <Card
+        key={type}
+        sx={{
+          borderRadius: '10px',
+          width: { xs: '100%', md: '40%', lg: 300 },
+          cursor: 'pointer',
+          border: '2px solid transparent',
+          '&:hover': {
+            border: '2px solid #B2C6FB',
+          },
+        }}
+      >
+        <CardContent>
+          <Typography fontWeight="bold" gutterBottom>
+            {label}
+          </Typography>
+          {treatment?.service_date && (
+            <Box display="flex" mt={1} mb={2}>
+              <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
+                Fecha:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {formatDate(treatment.service_date)}
+              </Typography>
+            </Box>
+          )}
+          {/* Files */}
+          {filteredDocuments.length > 0 ? (
             <Box display="flex" flexWrap="wrap" gap={1}>
-              {filteredDocuments.map((document) => (
-                <Box key={document.id} position="relative" display="inline-block">
-                  <a
-                    data-src={document.file_url}
-                    href={document.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {document.file_url.endsWith('.pdf') ? (
-                      <PictureAsPdfIcon
+              {filteredDocuments.map((document) => {
+                const isPdf = document.file_url.endsWith('.pdf');
+                return (
+                  <Box key={document.id} position="relative" display="inline-block">
+                    {isPdf ? (
+                      // thumbnail PDF clickeable
+                    <Box
+                    onClick={() => setPreviewFile({
+                      preview: document.file_url,
+                      type: 'application/pdf',
+                      name: document.id
+                      })}
                         sx={{
-                          fontSize: 40,
-                          cursor: 'pointer',
-                          color: 'primary.main',
-                          marginRight: '8px',
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src={document.file_url}
-                        alt={label}
-                        style={{
                           width: 100,
                           height: 100,
-                          objectFit: 'cover',
-                          borderRadius: 4,
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          overflow: 'hidden',
+                          position: 'relative',
                         }}
-                      />
+                      >
+                        <object
+                          data={document.file_url}
+                          type="application/pdf"
+                          width="100%"
+                          height="100%"
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      </Box>
+                    ) : (
+                      // imágenes dentro de LightGallery
+                      <LightGallery selector="a" download={false}>
+                        <a
+                          data-src={document.file_url}
+                          href={document.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={document.file_url}
+                            alt={label}
+                            style={{
+                              width: 100,
+                              height: 100,
+                              objectFit: 'cover',
+                              borderRadius: 4,
+                              cursor: 'pointer',
+                            }}
+                          />
+                        </a>
+                      </LightGallery>
                     )}
-                  </a>
-                  <IconButton
-                    onClick={() => handleDeleteDocument(document.id)}
-                    color="error"
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      right: 0,
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                      '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' },
-                    }}
-                  >
-                    <DeleteForeverIcon />
-                  </IconButton>
-                </Box>
-              ))}
+                    <IconButton
+                      onClick={() => handleDeleteDocument(document.id)}
+                      color="error"
+                      sx={{
+                        position: 'absolute',
+                        top: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' },
+                      }}
+                    >
+                      <DeleteForeverIcon />
+                    </IconButton>
+                  </Box>
+                );
+              })}
             </Box>
-          </LightGallery>
-        ) : (
-          <Typography variant="body2" color="textSecondary">
-            No hay documentos
-          </Typography>
-        )}
-      </CardContent>
-      <CardActions>
-        <Button variant={filteredDocuments.length > 0 ? 'outlined' : 'contained'} onClick={() => handleOpenModal(type)}>
-          {filteredDocuments.length > 0 ? 'Actualizar' : 'Subir'}
-        </Button>
-      </CardActions>
-    </Card>
-  );
-};
-
+          ) : (
+            <Typography variant="body2" color="textSecondary">
+              No hay documentos
+            </Typography>
+          )}
+        </CardContent>
+        <CardActions>
+          <Button
+            variant={filteredDocuments.length > 0 ? 'outlined' : 'contained'}
+            onClick={() => handleOpenModal(type)}
+          >
+            {filteredDocuments.length > 0 ? 'Actualizar' : 'Subir'}
+          </Button>
+        </CardActions>
+      </Card>
+    );
+  };
 
   return (
     <div className="container mx-auto max-w-screen-lg px-4 py-8">
@@ -260,6 +300,12 @@ const renderCard = (type, label) => {
         setNewRecordDate={setNewRecordDate}
         setNewRecordFiles={setNewRecordFiles}
         handleSaveRecord={handleSaveDocument}
+      />
+
+      <FilePreviewModal
+        open={Boolean(previewFile)}
+        onClose={() => setPreviewFile(null)}
+        file={previewFile}
       />
     </div>
   );

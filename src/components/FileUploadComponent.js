@@ -1,46 +1,61 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Box, Button, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Avatar } from '@mui/material';
-import { Upload as UploadIcon, Delete as DeleteIcon, PictureAsPdf as PdfIcon } from '@mui/icons-material';
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  ListItemSecondaryAction, 
+  IconButton,
+  Modal
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { Upload as UploadIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import imageCompression from 'browser-image-compression';
+import FilePreviewModal from './FilePreviewModal';
 
 export default function FileUploadComponent({ onFileUpload }) {
   const [files, setFiles] = useState([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
 
   const compressImage = async (file) => {
     try {
       const options = {
-        maxSizeMB: 1, // Tamaño máximo en MB
-        maxWidthOrHeight: 1920, // Máxima resolución
-        useWebWorker: true, // Usar Web Workers para optimización
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
       };
       return await imageCompression(file, options);
-    } catch (error) {
-      console.error('Error al comprimir la imagen:', error);
-      return file; // Si falla la compresión, devolver el archivo original
+    } catch {
+      return file;
     }
   };
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
-      const compressedFilesPromises = acceptedFiles.map(async (file) => {
-        if (file.type.startsWith('image/')) {
-          const compressedFile = await compressImage(file);
-          return Object.assign(compressedFile, {
-            preview: URL.createObjectURL(compressedFile),
-          });
-        }
-        return Object.assign(file, {
-          preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-        });
-      });
-
-      const compressedFiles = await Promise.all(compressedFilesPromises);
-      setFiles((prevFiles) => [...prevFiles, ...compressedFiles]);
-      onFileUpload(compressedFiles);
+      const processed = await Promise.all(
+        acceptedFiles.map(async (file) => {
+          const previewUrl = URL.createObjectURL(file);
+          if (file.type.startsWith('image/')) {
+            const compressed = await compressImage(file);
+            URL.revokeObjectURL(previewUrl);
+            const compressedPreview = URL.createObjectURL(compressed);
+            return Object.assign(compressed, { preview: compressedPreview });
+          } else if (file.type === 'application/pdf') {
+            return Object.assign(file, { preview: previewUrl });
+          }
+          return null;
+        })
+      );
+      const valid = processed.filter(Boolean);
+      setFiles(prev => [...prev, ...valid]);
+      onFileUpload(valid);
     },
     [onFileUpload]
   );
@@ -55,77 +70,109 @@ export default function FileUploadComponent({ onFileUpload }) {
   });
 
   const removeFile = (index) => {
-    setFiles((prevFiles) => {
-      const updatedFiles = [...prevFiles];
-      const removedFile = updatedFiles.splice(index, 1)[0];
-      if (removedFile.preview) {
-        URL.revokeObjectURL(removedFile.preview);
-      }
-      return updatedFiles;
+    setFiles(prev => {
+      const upd = [...prev];
+      const [removed] = upd.splice(index, 1);
+      if (removed.preview) URL.revokeObjectURL(removed.preview);
+      return upd;
     });
   };
 
   useEffect(() => {
-    // Limpiar las URLs creadas cuando el componente se desmonta
-    return () =>
-      files.forEach((file) => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview);
+    return () => {
+      files.forEach(f => {
+        if (f.preview) {
+          URL.revokeObjectURL(f.preview);
         }
       });
-  }, [files]);
+    };
+  }, []);
+  
 
   return (
-    <Box className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
-      <div {...getRootProps()} className="cursor-pointer mb-4">
-        <input {...getInputProps()} />
-        <Box className="text-center">
-          <UploadIcon className="text-gray-400 mb-2" style={{ fontSize: 48 }} />
-          <Typography variant="h6" sx={{ marginBottom: 2 }}>
-            {isDragActive
-              ? 'Suelta los archivos aquí'
-              : 'Arrastra y suelta archivos aquí, o haz clic para seleccionar (PNG, JPG, PDF)'}
-          </Typography>
-          <Button
-            variant="contained"
-            sx={{ backgroundColor: '#788BFF', fontWeight: '550' }}
-            startIcon={<UploadFileIcon />}
-          >
-            Seleccionar Archivos
-          </Button>
-        </Box>
-      </div>
-      {files.length > 0 && (
-        <List className="mt-4">
-          {files.map((file, index) => (
-            <ListItem key={index} className="bg-gray-100 rounded mb-2 flex items-center">
-              {file.type.startsWith('image/') ? (
-                <Avatar
-                  variant="square"
-                  sx={{ width: 56, height: 56 }}
-                  src={file.preview}
-                  alt={file.name}
-                  className="mr-2"
+    <>
+      <Box className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
+        <div {...getRootProps()} className="cursor-pointer mb-4">
+          <input {...getInputProps()} />
+          <Box textAlign="center">
+            <UploadIcon fontSize="large" color="action" />
+            <Typography variant="h6" sx={{ my: 1 }}>
+              {isDragActive
+                ? 'Suelta los archivos aquí'
+                : 'Arrastra o haz clic para seleccionar (PNG, JPG, PDF)'}
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<UploadFileIcon />}
+              sx={{ backgroundColor: '#788BFF', fontWeight: 550 }}
+            >
+              Seleccionar Archivos
+            </Button>
+          </Box>
+        </div>
+
+        {files.length > 0 && (
+          <List>
+            {files.map((file, idx) => (
+              <ListItem
+                key={idx}
+                className="bg-gray-100 rounded mb-2 flex items-center"
+              >
+                {/* thumbnail area */}
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    mr: 2,
+                    border: '1px solid #ccc',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    setPreviewFile(file);
+                    setPreviewOpen(true);
+                  }}
+                >
+                  {file.type.startsWith('image/') ? (
+                    <img
+                      src={file.preview}
+                      alt={file.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <object
+                      data={file.preview}
+                      type="application/pdf"
+                      width="100%"
+                      height="100%"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                </Box>
+
+                <ListItemText
+                  primary={file.name}
+                  secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`}
                 />
-              ) : (
-                <Avatar variant="square" className="mr-2" sx={{ width: 56, height: 56 }}>
-                  <PdfIcon color="info" />
-                </Avatar>
-              )}
-              <ListItemText
-                primary={file.name}
-                secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`}
-                className="flex-grow"
-              />
-              <ListItemSecondaryAction>
-                <IconButton edge="end" aria-label="delete" onClick={() => removeFile(index)}>
-                  <DeleteIcon />
-                </IconButton>
-              </ListItemSecondaryAction>
-            </ListItem>
-          ))}
-        </List>
-      )}
-    </Box>
+
+                <ListItemSecondaryAction>
+                  <IconButton edge="end" onClick={() => removeFile(idx)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
+
+      {/* Preview Modal */}
+      <FilePreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        file={previewFile}
+      />
+    </>
   );
 }

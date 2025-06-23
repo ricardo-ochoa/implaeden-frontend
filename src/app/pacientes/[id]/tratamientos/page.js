@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -24,9 +24,8 @@ import TreatmentCard from '@/components/TreatmentCard';
 import UpdateStatusModal from '@/components/UpdateStatusModal';
 
 
-export default function Tratamientos({ params: paramsPromise }) {
+export default function Tratamientos({ params }) {
   const router = useRouter();
-  const params = use(paramsPromise);
   const { id } = params;
   const { treatments, loading, fetchPatientTreatments, deleteTreatment } = usePatientTreatments(id);
   const [patient, setPatient] = useState(null);
@@ -248,6 +247,8 @@ export default function Tratamientos({ params: paramsPromise }) {
         selectedService={selectedService}
         setSelectedService={setSelectedService}
         handleSaveRecord={handleSaveRecord}
+        newRecordFiles={newRecordFiles}
+        setNewRecordFiles={setNewRecordFiles}
       />
 
       <ConfirmDeleteModal
