@@ -2414,6 +2414,11 @@ inherits@2.0.4:
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.4.tgz#0fa2c64f932917c3433a0ded55363aae37416b7c"
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
 
+install@^0.13.0:
+  version "0.13.0"
+  resolved "https://registry.yarnpkg.com/install/-/install-0.13.0.tgz#6af6e9da9dd0987de2ab420f78e60d9c17260776"
+  integrity sha512-zDml/jzr2PKU9I8J/xyZBQn8rPCAY//UOYNmR01XwNwyfhEWObo2SWfSl1+0tm1u6PhxLwDnfsT/6jB7OUxqFA==
+
 internal-slot@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/internal-slot/-/internal-slot-1.1.0.tgz#1eac91762947d2f7056bc838d93e13b2e9604961"
@@ -2675,6 +2680,11 @@ jiti@^1.21.6:
   resolved "https://registry.yarnpkg.com/jiti/-/jiti-1.21.7.tgz#9dd81043424a3d28458b193d965f0d18a2300ba9"
   integrity sha512-/imKNG4EbWNrVjoNC/1H5/9GFy+tqjGBHCaSsN+P2RnPqjsLmv6UD3Ej+Kj8nBWaRAwyk7kK5ZUc+OEatnTR3A==
 
+jquery@>=1.7.0:
+  version "3.7.1"
+  resolved "https://registry.yarnpkg.com/jquery/-/jquery-3.7.1.tgz#083ef98927c9a6a74d05a6af02806566d16274de"
+  integrity sha512-m4avr8yL8kmFN8psrbFFFmB/If14iN5o9nw/NgnnM+kybDJpRsAynV2BsfpTYrTRysYUdADVD7CkUUizgkpLfg==
+
 "js-tokens@^3.0.0 || ^4.0.0", js-tokens@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
@@ -2776,10 +2786,17 @@ levn@^0.4.1:
     prelude-ls "^1.2.1"
     type-check "~0.4.0"
 
-lightgallery@^2.8.2:
-  version "2.8.3"
-  resolved "https://registry.yarnpkg.com/lightgallery/-/lightgallery-2.8.3.tgz#4e90b331a5db5433567d64baac338a1d8fe528df"
-  integrity sha512-s67Z7KZAhIu/io7qs2yIM+8+hUyDQ1ufRtCQwhFnmHVzRQ8cKlxf53CxS/DpJ0sDGOWHNx5L6Y3PfACQxiH+8A==
+lg-video@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/lg-video/-/lg-video-1.4.0.tgz#814449a4c3b9a3c74ecfd388ddba0d03b8154fee"
+  integrity sha512-Ae6H9B8NT32min2482yZ5/eZantW33d4TnHBNy3DMQc2Z060naZydNNBCXhlVkuZ3NbQ9veZUZ23kmrrbCx4pQ==
+  dependencies:
+    jquery ">=1.7.0"
+
+lightgallery@^2.9.0-beta.1:
+  version "2.9.0-beta.1"
+  resolved "https://registry.yarnpkg.com/lightgallery/-/lightgallery-2.9.0-beta.1.tgz#4a69f1a500450ef10b1a7c912a0d36431498b43e"
+  integrity sha512-4Bl1vsYGOsI6RsPyephAUFW8bbZuZlLrpxU59cfKYKPDEX5Mhxfo1DUoUIJ+j5QPNrHEqrd+QeQtnGUCCwqK2g==
 
 lilconfig@^3.0.0, lilconfig@^3.1.3:
   version "3.1.3"
@@ -3847,6 +3864,11 @@ svg-pathdata@^6.0.3:
   version "6.0.3"
   resolved "https://registry.yarnpkg.com/svg-pathdata/-/svg-pathdata-6.0.3.tgz#80b0e0283b652ccbafb69ad4f8f73e8d3fbf2cac"
   integrity sha512-qsjeeq5YjBZ5eMdFuUa4ZosMLxgr5RZ+F+Y1OrDhuOCEInRMA3x74XdBtggJcj9kOeInz0WE+LgCPDkZFlBYJw==
+
+swiper@^11.2.8:
+  version "11.2.8"
+  resolved "https://registry.yarnpkg.com/swiper/-/swiper-11.2.8.tgz#2b5d7da3093454c0a7bf090f1714fb4332142702"
+  integrity sha512-S5FVf6zWynPWooi7pJ7lZhSUe2snTzqLuUzbd5h5PHUOhzgvW0bLKBd2wv0ixn6/5o9vwc/IkQT74CRcLJQzeg==
 
 tailwindcss@^3.4.1:
   version "3.4.17"

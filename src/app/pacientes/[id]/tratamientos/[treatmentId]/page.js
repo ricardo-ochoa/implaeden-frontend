@@ -10,7 +10,11 @@ import {
   CircularProgress,
   Alert,
   IconButton,
-  Modal,
+  Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Divider,
 } from '@mui/material';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import LightGallery from 'lightgallery/react';
@@ -21,9 +25,13 @@ import SectionTitle from '@/components/SectionTitle';
 import { useParams } from 'next/navigation';
 import { usePatient } from '@/context/PatientContext';
 import usePatientTreatments from '../../../../../../lib/hooks/usePatientTreatments';
-import CloseIcon from '@mui/icons-material/Close';
+import EmailIcon from '@mui/icons-material/Email';
 import FilePreviewModal from '@/components/FilePreviewModal';
 import { formatDate } from '../../../../../../lib/utils/formatDate';
+import useEmailDocuments from '../../../../../../lib/hooks/useEmailDocuments';
+import { ExpandMore } from '@mui/icons-material';
+import UploadEvidencesModal from '@/components/UploadEvidencesModal';
+import TreatmentDetailEvidences from '@/components/TreatmentDetailEvidences';
 
 const DOCUMENT_TYPES = [
   { type: 'budget', label: 'Presupuesto' },
@@ -34,6 +42,7 @@ const DOCUMENT_TYPES = [
 export default function TreatmentDetail() {
   const { id, treatmentId } = useParams();
   const { patient, setPatient } = usePatient();
+  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } = useEmailDocuments();
   const { treatments } = usePatientTreatments(id);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
@@ -130,7 +139,6 @@ export default function TreatmentDetail() {
     }
   };
   
-
   const handleDeleteDocument = async (documentId) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
   
@@ -158,13 +166,15 @@ export default function TreatmentDetail() {
   
   const renderCard = (type, label) => {
     const filteredDocuments = documents.filter((doc) => doc.document_type === type);
+    const isEmailLoading = loadingLabels.has(label);
   
     return (
       <Card
         key={type}
+        display="flex"
         sx={{
           borderRadius: '10px',
-          width: { xs: '100%', md: '40%', lg: 300 },
+          width: { xs: '100%', md: '40%', lg: "100%" },
           cursor: 'pointer',
           border: '2px solid transparent',
           '&:hover': {
@@ -172,6 +182,7 @@ export default function TreatmentDetail() {
           },
         }}
       >
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         <CardContent>
           <Typography fontWeight="bold" gutterBottom>
             {label}
@@ -192,7 +203,7 @@ export default function TreatmentDetail() {
               {filteredDocuments.map((document) => {
                 const isPdf = document.file_url.endsWith('.pdf');
                 return (
-                  <Box key={document.id} position="relative" display="inline-block">
+                  <Box key={document.id} position="relative" display="inline-block" width="100%">
                     {isPdf ? (
                       // thumbnail PDF clickeable
                     <Box
@@ -202,10 +213,9 @@ export default function TreatmentDetail() {
                       name: document.id
                       })}
                         sx={{
-                          width: 100,
+                          width: "100%",
                           height: 100,
                           borderRadius: 1,
-                          cursor: 'pointer',
                           overflow: 'hidden',
                           position: 'relative',
                         }}
@@ -215,7 +225,7 @@ export default function TreatmentDetail() {
                           type="application/pdf"
                           width="100%"
                           height="100%"
-                          style={{ pointerEvents: 'none' }}
+                          style={{ pointerEvents: 'none', cursor: 'pointer'}}
                         />
                       </Box>
                     ) : (
@@ -231,7 +241,7 @@ export default function TreatmentDetail() {
                             src={document.file_url}
                             alt={label}
                             style={{
-                              width: 100,
+                              width: "100%",
                               height: 100,
                               objectFit: 'cover',
                               borderRadius: 4,
@@ -264,20 +274,44 @@ export default function TreatmentDetail() {
             </Typography>
           )}
         </CardContent>
-        <CardActions>
-          <Button
-            variant={filteredDocuments.length > 0 ? 'outlined' : 'contained'}
-            onClick={() => handleOpenModal(type)}
-          >
-            {filteredDocuments.length > 0 ? 'Actualizar' : 'Subir'}
-          </Button>
+        <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Button
+          variant={filteredDocuments.length > 0 ? 'outlined' : 'contained'}
+          onClick={() => handleOpenModal(type)}
+        >
+          {filteredDocuments.length > 0 ? 'Actualizar' : 'Subir'}
+        </Button>
+
+        {/* Botón de enviar por email */}
+        <Button
+          variant="text"
+          color="primary"
+          startIcon={ isEmailLoading
+            ? <CircularProgress size={16} />
+            : <EmailIcon />
+          }
+          onClick={() =>
+            sendDocuments({
+              to: patient.email,
+              docs: filteredDocuments.map(d => d.file_url),
+              label,
+              treatmentName: treatment?.service_name,
+              patientName: patient?.nombre
+            })
+          }
+          disabled={filteredDocuments.length === 0 || isEmailLoading}
+          sx={{ cursor:"pointer"}}
+        >
+           { isEmailLoading ? 'Enviando…' : 'Enviar por mail' }
+        </Button>
         </CardActions>
+        </Box>
       </Card>
     );
   };
 
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="px-10 py-10">
       <SectionTitle
         title={`${patient?.nombre || 'Cargando...'} - ${treatment?.service_name || 'Tratamiento'}`}
         breadcrumbs={[
@@ -289,9 +323,39 @@ export default function TreatmentDetail() {
 
       {loading && <CircularProgress />}
       {error && <Alert severity="error">{error}</Alert>}
-      <Box display="flex" gap={2} flexWrap="wrap">
-        {DOCUMENT_TYPES.map(({ type, label }) => renderCard(type, label))}
-      </Box>
+      <Accordion
+        sx={{
+          backgroundColor: "#F0F4FF",
+          border: '2px solid transparent',
+          '&:hover': {
+            border: '2px solid #E8EFFF',
+          },
+        }}
+      >
+      <AccordionSummary
+          expandIcon={<ExpandMore />}
+          id="docs"
+        >
+          <Typography component="span" fontWeight={"bold"} variant="h6">Documentos</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Box display="flex" gap={2} sx={{
+            width: '100%',
+            flexWrap: {
+              xs: 'wrap',
+              lg: 'nowrap',
+            },
+          }}>
+            {DOCUMENT_TYPES.map(({ type, label }) => renderCard(type, label))}
+          </Box>
+        </AccordionDetails>
+      </Accordion>
+
+      <TreatmentDetailEvidences
+        patientId={id}
+        treatmentId={treatmentId}
+      />
+
       <UploadFilesModal
         open={isModalOpen}
         onClose={handleCloseModal}
@@ -307,6 +371,22 @@ export default function TreatmentDetail() {
         onClose={() => setPreviewFile(null)}
         file={previewFile}
       />
+
+      <Snackbar
+          open={emailAlert.open}
+          autoHideDuration={4000}
+          onClose={closeAlert}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={closeAlert}
+            severity={emailAlert.severity}
+            sx={{ width: '100%' }}
+          >
+            {emailAlert.message}
+          </Alert>
+        </Snackbar>
+
     </div>
   );
 }

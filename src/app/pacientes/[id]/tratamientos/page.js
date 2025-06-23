@@ -176,7 +176,7 @@ export default function Tratamientos({ params }) {
   };
 
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="mx-auto max-w-screen-lg px-4 py-8">
       {loading ? (
         <Typography variant="h5" gutterBottom>
           Cargando...

@@ -9,10 +9,8 @@ import {
   ListItem, 
   ListItemText, 
   ListItemSecondaryAction, 
-  IconButton,
-  Modal
+  IconButton
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import { Upload as UploadIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -42,17 +40,30 @@ export default function FileUploadComponent({ onFileUpload }) {
       const processed = await Promise.all(
         acceptedFiles.map(async (file) => {
           const previewUrl = URL.createObjectURL(file);
+
           if (file.type.startsWith('image/')) {
+            // comprime la imagen
             const compressed = await compressImage(file);
             URL.revokeObjectURL(previewUrl);
             const compressedPreview = URL.createObjectURL(compressed);
             return Object.assign(compressed, { preview: compressedPreview });
-          } else if (file.type === 'application/pdf') {
+          }
+
+          if (file.type === 'application/pdf') {
             return Object.assign(file, { preview: previewUrl });
           }
+
+          if (file.type.startsWith('video/')) {
+            // vídeo: no compress, solo preview
+            return Object.assign(file, { preview: previewUrl });
+          }
+
+          // formato no soportado
+          URL.revokeObjectURL(previewUrl);
           return null;
         })
       );
+
       const valid = processed.filter(Boolean);
       setFiles(prev => [...prev, ...valid]);
       onFileUpload(valid);
@@ -63,10 +74,10 @@ export default function FileUploadComponent({ onFileUpload }) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/png': ['.png'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'application/pdf': ['.pdf'],
-    },
+      'image/*': [],
+      'application/pdf': [],
+      'video/*': [],
+    }
   });
 
   const removeFile = (index) => {
@@ -78,28 +89,26 @@ export default function FileUploadComponent({ onFileUpload }) {
     });
   };
 
+  // cleanup de previews al desmontar
   useEffect(() => {
     return () => {
       files.forEach(f => {
-        if (f.preview) {
-          URL.revokeObjectURL(f.preview);
-        }
+        if (f.preview) URL.revokeObjectURL(f.preview);
       });
     };
-  }, []);
-  
+  }, [files]);
 
   return (
     <>
-      <Box className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
-        <div {...getRootProps()} className="cursor-pointer mb-4">
+      <Box sx={{ p:4, border:'2px dashed #ccc', borderRadius:1 }}>
+        <div {...getRootProps()} style={{ cursor:'pointer', marginBottom:16 }}>
           <input {...getInputProps()} />
           <Box textAlign="center">
             <UploadIcon fontSize="large" color="action" />
-            <Typography variant="h6" sx={{ my: 1 }}>
+            <Typography variant="h6" sx={{ my:1 }}>
               {isDragActive
                 ? 'Suelta los archivos aquí'
-                : 'Arrastra o haz clic para seleccionar (PNG, JPG, PDF)'}
+                : 'Arrastra o haz clic para seleccionar (PNG, JPG, PDF, MP4...)'}
             </Typography>
             <Button
               variant="contained"
@@ -114,20 +123,11 @@ export default function FileUploadComponent({ onFileUpload }) {
         {files.length > 0 && (
           <List>
             {files.map((file, idx) => (
-              <ListItem
-                key={idx}
-                className="bg-gray-100 rounded mb-2 flex items-center"
-              >
-                {/* thumbnail area */}
+              <ListItem key={idx} sx={{ bgcolor:'#f5f5f5', mb:1, borderRadius:1 }}>
                 <Box
                   sx={{
-                    width: 56,
-                    height: 56,
-                    mr: 2,
-                    border: '1px solid #ccc',
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    cursor: 'pointer'
+                    width:56, height:56, mr:2, border:'1px solid #ccc',
+                    borderRadius:1, overflow:'hidden', cursor:'pointer'
                   }}
                   onClick={() => {
                     setPreviewFile(file);
@@ -138,15 +138,22 @@ export default function FileUploadComponent({ onFileUpload }) {
                     <img
                       src={file.preview}
                       alt={file.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ width:'100%', height:'100%', objectFit:'cover' }}
                     />
-                  ) : (
+                  ) : file.type === 'application/pdf' ? (
                     <object
                       data={file.preview}
                       type="application/pdf"
                       width="100%"
                       height="100%"
-                      style={{ pointerEvents: 'none' }}
+                      style={{ pointerEvents:'none' }}
+                    />
+                  ) : (
+                    <video
+                      src={file.preview}
+                      muted
+                      loop
+                      style={{ width:'100%', height:'100%', objectFit:'cover' }}
                     />
                   )}
                 </Box>
