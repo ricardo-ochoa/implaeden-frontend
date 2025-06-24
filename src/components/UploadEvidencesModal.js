@@ -19,7 +19,7 @@ export default function UploadEvidencesModal({ open, onClose, onUpload }) {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
-  // Cuando se cierra el modal, limpiamos
+  // Limpiar al cerrar
   useEffect(() => {
     if (!open) {
       setFiles([]);
@@ -44,29 +44,59 @@ export default function UploadEvidencesModal({ open, onClose, onUpload }) {
     <Modal
       open={open}
       onClose={onClose}
-      sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <Box
         sx={{
-          maxWidth: 600,
           width: '90%',
+          maxWidth: 1200,
+          height: '80vh',
           bgcolor: 'background.paper',
-          p: 4,
           borderRadius: 2,
           outline: 'none',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Typography variant="h6" gutterBottom>
-          Subir evidencias
-        </Typography>
+        {/* Header fijo */}
+        <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="h6" fontWeight="bold">
+            Subir evidencias
+          </Typography>
+        </Box>
 
-        {/* Le pasamos el accept para imágenes y vídeos */}
-        <FileUploadComponent
-          accept="image/*,video/*"
-          onFileUpload={setFiles}
-        />
+        {/* Contenido scrollable */}
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            p: 3,
+          }}
+        >
+          <FileUploadComponent
+            accept="image/*,video/*"
+            onFileUpload={(newFiles) => {
+              // newFiles es un array de File: los acumulamos
+              setFiles(prev => [...prev, ...newFiles]);
+            }}
+            />
+        </Box>
 
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        {/* Footer fijo */}
+        <Box
+          sx={{
+            p: 3,
+            borderTop: 1,
+            borderColor: 'divider',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 2,
+          }}
+        >
           <Button onClick={onClose} disabled={uploading}>
             Cancelar
           </Button>

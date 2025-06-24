@@ -15,6 +15,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
+  Chip,
 } from '@mui/material';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import LightGallery from 'lightgallery/react';
@@ -336,7 +337,10 @@ export default function TreatmentDetail() {
           expandIcon={<ExpandMore />}
           id="docs"
         >
-          <Typography component="span" fontWeight={"bold"} variant="h6">Documentos</Typography>
+           <div className='flex items-center'>
+            <Typography component="span" fontWeight={"bold"} variant="h6" mr={1}>Documentos</Typography>
+            <Chip label={<span className='font-bold'>{documents.length}</span>} color="primary" size="small"/>
+           </div>
         </AccordionSummary>
         <AccordionDetails>
           <Box display="flex" gap={2} sx={{
