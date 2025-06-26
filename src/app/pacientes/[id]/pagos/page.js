@@ -134,7 +134,7 @@ export default function PatientPayments({ params: paramsPromise }) {
         // Mapea sólo lo necesario
         const mapped = paymentsData.map(p => ({
           id:              p.id,
-          fecha:           p.fecha.split('T')[0],          // "YYYY-MM-DD"
+          fecha:           p.fecha.split('T')[0],
           patient_service_id: p.patient_service_id,
           total_cost:      parseFloat(p.total_cost),
           monto:           parseFloat(p.monto),

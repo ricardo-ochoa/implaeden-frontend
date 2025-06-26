@@ -32,6 +32,7 @@ import { formatDate } from '../../../../../../lib/utils/formatDate';
 import useEmailDocuments from '../../../../../../lib/hooks/useEmailDocuments';
 import { ExpandMore } from '@mui/icons-material';
 import UploadEvidencesModal from '@/components/UploadEvidencesModal';
+import FilePresentOutlinedIcon from '@mui/icons-material/FilePresentOutlined';
 import TreatmentDetailEvidences from '@/components/TreatmentDetailEvidences';
 
 const DOCUMENT_TYPES = [
@@ -85,10 +86,11 @@ export default function TreatmentDetail() {
 
   useEffect(() => {
     if (!treatmentId || !treatments.length) return;
-  
-    const current = treatments.find(t => t.treatment_id === parseInt(treatmentId));
+    const current = treatments.find((t) => t.treatment_id === parseInt(treatmentId, 10));
     setTreatment(current);
-  }, [treatmentId, treatments]);  
+  }, [treatmentId, treatments]);
+
+  if (!treatment) return <CircularProgress />;
 
   const handleOpenModal = (type) => {
     setSelectedDocumentType(type);
@@ -311,6 +313,10 @@ export default function TreatmentDetail() {
     );
   };
 
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+
+
   return (
     <div className="px-10 py-10">
       <SectionTitle
@@ -322,8 +328,18 @@ export default function TreatmentDetail() {
         ]}
       />
 
+      <Box display="flex" alignItems="center" mb={3}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, mr: 1 }}>
+          Costo del tratamiento:
+        </Typography>
+        <Typography variant="h6">
+          {formatCurrency(treatment.total_cost)}
+        </Typography>
+      </Box>
+
       {loading && <CircularProgress />}
       {error && <Alert severity="error">{error}</Alert>}
+
       <Accordion
         sx={{
           backgroundColor: "#F0F4FF",
@@ -338,7 +354,8 @@ export default function TreatmentDetail() {
           id="docs"
         >
            <div className='flex items-center'>
-            <Typography component="span" fontWeight={"bold"} variant="h6" mr={1}>Documentos</Typography>
+            <FilePresentOutlinedIcon className='mr-1'/>
+            <Typography component="span" fontWeight={"bold"} variant="h6" mr={1}> Documentos</Typography>
             <Chip label={<span className='font-bold'>{documents.length}</span>} color="primary" size="small"/>
            </div>
         </AccordionSummary>

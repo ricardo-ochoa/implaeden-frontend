@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// components/ModalServicio.js
+import React, { useEffect } from 'react'
 import {
   Box,
   Button,
@@ -7,33 +8,34 @@ import {
   Typography,
   MenuItem,
   Select,
-  InputLabel,
   FormControl,
-} from '@mui/material';
-import useServices from '../../lib/hooks/useServices';
+  InputLabel,
+} from '@mui/material'
+import useServices from '../../lib/hooks/useServices'
 
-const ModalServicio = ({
+export default function ModalServicio({
   open,
   onClose,
-  title = 'Agregar servicio al paciente:',
+  title,
   newRecordDate,
   setNewRecordDate,
   selectedService,
   setSelectedService,
+  initialCost,
+  setInitialCost,
   handleSaveRecord,
-}) => {
-  const { services, loading, error, fetchServices } = useServices();
+}) {
+  const { services, loading, error, fetchServices } = useServices()
 
   useEffect(() => {
-    if (open) fetchServices();
-  }, [open]);
+    if (open) fetchServices()
+  }, [open])
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       aria-labelledby="modal-title"
-      aria-describedby="modal-description"
       sx={{
         display: 'flex',
         alignItems: 'center',
@@ -42,77 +44,90 @@ const ModalServicio = ({
     >
       <Box
         sx={{
-          maxWidth: '900px',
-          width: '90%',
-          maxHeight: '90%',
-          overflowY: 'auto',
           bgcolor: 'background.paper',
           p: 4,
           borderRadius: 2,
+          maxWidth: 600,
+          width: '90%',
         }}
       >
-        <Typography id="modal-title" variant="h6" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
           {title}
         </Typography>
 
-        <Typography variant="subtitle2" sx={{ fontWeight: '550', mb: 1 }}>
-          Fecha de inicio del tratamiento:
+        {/* Fecha */}
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          Fecha de inicio:
         </Typography>
         <TextField
-          placeholder="Fecha del registro"
           type="date"
           fullWidth
           value={newRecordDate}
           onChange={(e) => setNewRecordDate(e.target.value)}
-          sx={{ marginBottom: 2 }}
+          sx={{ mb: 2 }}
         />
 
-        <Typography variant="subtitle2" sx={{ fontWeight: '550', mb: 1 }}>
-          Selecciona el servicio:
+        {/* Servicio */}
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          Servicio:
         </Typography>
-        <FormControl fullWidth sx={{ marginBottom: 2 }}>
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Servicio</InputLabel>
           <Select
-            labelId="service-select-label"
             value={selectedService}
+            label="Servicio"
             onChange={(e) => setSelectedService(e.target.value)}
-            disabled={loading || error}
+            disabled={loading || Boolean(error)}
           >
-            {loading ? (
+            {loading && (
               <MenuItem value="" disabled>
-                Cargando servicios...
+                Cargando…
               </MenuItem>
-            ) : error ? (
-              <MenuItem value="" disabled>
-                Error al cargar servicios
-              </MenuItem>
-            ) : (
-              services.map((service) => (
-                <MenuItem key={service.id} value={service.id}>
-                  <span className='font-bold mr-1'>{service.name}</span> - {service.category}
-                </MenuItem>
-              ))
             )}
+            {error && (
+              <MenuItem value="" disabled>
+                Error al cargar
+              </MenuItem>
+            )}
+            {!loading &&
+              !error &&
+              services.map((svc) => (
+                <MenuItem key={svc.id} value={svc.id}>
+                  <strong>{svc.name}</strong> — {svc.category}
+                </MenuItem>
+              ))}
           </Select>
         </FormControl>
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2 }}>
-          <Button variant="outlined" onClick={onClose} color='error'>
+        {/* Costo inicial */}
+        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          Costo inicial (MXN):
+        </Typography>
+        <TextField
+          type="number"
+          fullWidth
+          value={initialCost}
+          onChange={(e) => setInitialCost(e.target.value)}
+          sx={{ mb: 2 }}
+          inputProps={{ min: 0, step: 0.01 }}
+        />
+
+        {/* Botones */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button onClick={onClose} color="error" variant="outlined">
             Cancelar
           </Button>
           <Button
-            variant="contained"
             onClick={handleSaveRecord}
-            size="large"
-            fullWidth
-            sx={{ maxWidth: '300px' }}
-            disabled={!newRecordDate || !selectedService}
+            variant="contained"
+            disabled={
+              !newRecordDate || !selectedService || initialCost === ''
+            }
           >
             Guardar
           </Button>
         </Box>
       </Box>
     </Modal>
-  );
-};
-
-export default ModalServicio;
+  )
+}
