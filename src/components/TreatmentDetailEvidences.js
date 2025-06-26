@@ -90,7 +90,7 @@ export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
             label={evidences.length}
             color="primary"
             size="small"
-            sx={{ fontWeight: 'bold',            mr:4, }}
+            sx={{ fontWeight: 'bold', mr:4 }}
           />
           {selectedIds.size > 0 && (
             <Button
