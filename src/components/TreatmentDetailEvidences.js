@@ -20,6 +20,7 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import useTreatmentEvidences from '../../lib/hooks/useTreatmentEvidences';
 import UploadEvidencesModal from './UploadEvidencesModal';
+import ImageIcon from '@mui/icons-material/Image';
 
 export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
   const {
@@ -83,6 +84,7 @@ export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
             width: { xs: '100%', sm: 'auto' },
           }}
         >
+            <ImageIcon className="mr-1" />
           <Typography variant="h6" fontWeight="bold">
             Evidencias
           </Typography>

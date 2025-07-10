@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Avatar,
   Box,
   Card,
   CardContent,
@@ -43,7 +42,7 @@ const TreatmentCard = ({ treatment, onMenuOpen, onClick, onStatusClick }) => {
       }}
     >
       <CardContent onClick={onClick} sx={{ position: 'relative' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+        <Box display="flex" justifyContent="space-between">
           <Box
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
@@ -91,7 +90,7 @@ const TreatmentCard = ({ treatment, onMenuOpen, onClick, onStatusClick }) => {
         </Box>
 
         <Typography variant="body2" sx={{ marginRight: 1 }}>
-          <span className="font-semibold">Categoría: </span> {treatment.service_category}
+          <span className="font-semibold">Categoría: </span> {treatment.category}
         </Typography>
 
         <Box display="flex" mt={1}>

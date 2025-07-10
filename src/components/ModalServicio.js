@@ -93,7 +93,7 @@ export default function ModalServicio({
               !error &&
               services.map((svc) => (
                 <MenuItem key={svc.id} value={svc.id}>
-                  <strong>{svc.name}</strong> — {svc.category}
+                  <strong>{svc.name}</strong> — {svc?.category}
                 </MenuItem>
               ))}
           </Select>

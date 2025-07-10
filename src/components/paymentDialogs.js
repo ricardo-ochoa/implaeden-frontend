@@ -19,6 +19,7 @@ import {
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { PAYMENT_METHODS } from '../../lib/utils/paymentmethods';
+import { formatDate } from '../../lib/utils/formatDate';
 
 export function PaymentDetailsDialog({
   open,
@@ -34,11 +35,11 @@ export function PaymentDetailsDialog({
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
-      case "pagado":
+      case "finalizado":
         return "success";   // verde
-      case "pendiente":
+      case "abono":
         return "warning";   // amarillo/naranja
-      case "parcial":
+      case "reembolsado":
         return "info";      // azul claro
       case "cancelado":
         return "error";     // rojo
@@ -64,7 +65,7 @@ export function PaymentDetailsDialog({
           <Grid item xs={6}>
             <Typography variant="subtitle2" fontWeight={"bold"}>Fecha</Typography>
             <Typography>
-              <CalendarTodayIcon fontSize="small"/> {payment.fecha}
+              <CalendarTodayIcon fontSize="small"/> {formatDate(payment.fecha)}
             </Typography>
           </Grid>
           <Grid item xs={6}>
@@ -112,25 +113,40 @@ export function PaymentFormDialog({
   servicios,
   onSave,
 }) {
-  const [form, setForm] = useState(initialData || {
-    fecha: '',
-    patient_service_id: '',
-    monto: '',
-    estado: 'pendiente',
-    metodo_pago: '',
-    notas: '',
-  });
+    const [form, setForm] = useState({
+      id: initialData?.id || null,
+      fecha: initialData?.fecha ? initialData.fecha.split('T')[0] : '',
+      patient_service_id: initialData?.patient_service_id || '',
+      monto: initialData?.monto || '',
+      estado: initialData?.estado || 'pendiente',
+      metodo_pago: initialData?.metodo_pago || '',
+      notas: initialData?.notas || '',
+    });
 
-  useEffect(() => {
-    setForm(initialData || {
+useEffect(() => {
+  if (initialData) {
+    setForm({
+      id: initialData.id,
+      fecha: initialData.fecha.split('T')[0],
+      patient_service_id: initialData.patient_service_id,
+      monto: initialData.monto,
+      estado: initialData.estado,
+      metodo_pago: initialData.metodo_pago,
+      notas: initialData.notas,
+    })
+  } else {
+    setForm({
+      id: null,
       fecha: '',
       patient_service_id: '',
       monto: '',
       estado: 'pendiente',
       metodo_pago: '',
       notas: '',
-    });
-  }, [initialData]);
+    })
+  }
+  }, [initialData])
+
 
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
@@ -177,16 +193,18 @@ export function PaymentFormDialog({
           </Grid>
           <Grid item xs={12}>
             <FormControl fullWidth>
-              <InputLabel>Estado</InputLabel>
+              <InputLabel>Estatus de pago</InputLabel>
               <Select
                 value={form.estado}
                 onChange={handleChange('estado')}
-                label="Estado"
+                label="Estatus de pago"
               >
-                <MenuItem value="pagado">Pagado</MenuItem>
-                <MenuItem value="pendiente">Pendiente</MenuItem>
-                <MenuItem value="parcial">Parcial</MenuItem>
+                <MenuItem value="abono">Abono</MenuItem>
+                <MenuItem value="finalizado">Finalizado</MenuItem>
                 <MenuItem value="cancelado">Cancelado</MenuItem>
+                <MenuItem value="reembolsado">Reembolsado</MenuItem>
+                {/* <MenuItem value="pendiente">Pendiente</MenuItem>
+                <MenuItem value="parcial">Parcial</MenuItem> */}
               </Select>
             </FormControl>
           </Grid>
@@ -219,9 +237,16 @@ export function PaymentFormDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button onClick={() => onSave(form)} variant="contained">
+        <Button
+          variant="contained"
+          onClick={async () => {
+            await onSave(form);
+            onClose();
+          }}
+        >
           Guardar
         </Button>
+
       </DialogActions>
     </Dialog>
   );
