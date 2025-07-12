@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Box,
   Button,
@@ -17,61 +17,82 @@ import {
   ListItemText,
   Divider,
   Paper,
-  IconButton,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import SectionTitle from '@/components/SectionTitle'
+import { useCitas } from '../../../../../lib/hooks/useCitas'
 
 export default function CitasClient({ paciente }) {
-  const pacienteId = paciente.id || ''
-  const [citas, setCitas] = useState([])
+  // 1) Defino pacienteId antes de usar el hook
+  const pacienteId = paciente.id
+  const {
+    citas,
+    loading: loadingCitas,
+    error: errorCitas,
+    refresh,
+    createCita,
+  } = useCitas(pacienteId)
+
+  // 2) Estado para el catálogo de servicios
+  const [servicios, setServicios] = useState([])
+
+  // 3) Formulario de nueva cita
   const [modalOpen, setModalOpen] = useState(false)
-  const [nuevaCita, setNuevaCita] = useState({
-    fechaHora: '',
-    tratamiento: '',
-    notas: '',
+  const [form, setForm] = useState({
+    appointment_at: '',
+    service_id: '',
+    observaciones: '',
   })
   const [mensaje, setMensaje] = useState('')
 
-  const handleInputChange = (field) => (e) => {
-    setNuevaCita((prev) => ({ ...prev, [field]: e.target.value }))
+  // 4) Carga inicial: citas + catálogo de servicios
+  useEffect(() => {
+    if (!pacienteId) return
+    refresh()
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`)
+      .then(r => r.json())
+      .then(data => setServicios(data))
+      .catch(console.error)
+  }, [pacienteId, refresh])
+
+  const handleChange = (field) => (e) => {
+    setForm(f => ({ ...f, [field]: e.target.value }))
   }
 
-  const handleGuardar = () => {
-    if (!nuevaCita.fechaHora || !nuevaCita.tratamiento.trim()) {
-      setMensaje('Por favor complete la fecha y el tratamiento')
+  const handleGuardar = async () => {
+    const { appointment_at, service_id } = form
+    if (!appointment_at || !service_id) {
+      setMensaje('Por favor complete fecha y tratamiento')
       return
     }
-
-    const cita = {
-      id: Date.now(),
-      fechaHora: nuevaCita.fechaHora,
-      tratamiento: nuevaCita.tratamiento.trim(),
-      notas: nuevaCita.notas.trim(),
-      creadoEn: new Date(),
+    try {
+      await createCita(form)
+      setMensaje('Cita guardada exitosamente')
+      setModalOpen(false)
+      setForm({ appointment_at: '', service_id: '', observaciones: '' })
+    } catch {
+      setMensaje('Error al guardar la cita')
     }
-
-    setCitas((prev) => [cita, ...prev])
-    setModalOpen(false)
-    setNuevaCita({ fechaHora: '', tratamiento: '', notas: '' })
-    setMensaje('Cita guardada exitosamente')
     setTimeout(() => setMensaje(''), 3000)
   }
 
-  const formatearFechaHora = (iso) => {
-    const d = new Date(iso)
-    return d.toLocaleString('es-ES', {
+  const formatearFechaHora = (iso) =>
+    new Date(iso).toLocaleString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
-  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <Container className="py-8">
       <SectionTitle
         title={`Historial de Citas: ${paciente.nombre} ${paciente.apellidos}`}
         breadcrumbs={[
@@ -86,6 +107,12 @@ export default function CitasClient({ paciente }) {
           <Alert severity={mensaje.includes('exitosamente') ? 'success' : 'error'}>
             {mensaje}
           </Alert>
+        </Box>
+      )}
+
+      {errorCitas && (
+        <Box mb={2}>
+          <Alert severity="error">Error cargando citas: {errorCitas}</Alert>
         </Box>
       )}
 
@@ -106,7 +133,11 @@ export default function CitasClient({ paciente }) {
               Historial de Citas ({citas.length})
             </Typography>
 
-            {citas.length === 0 ? (
+            {loadingCitas ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : citas.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body1" color="text.secondary">
                   No hay citas registradas aún
@@ -114,45 +145,49 @@ export default function CitasClient({ paciente }) {
               </Box>
             ) : (
               <List>
-                {citas.map((cita, idx) => (
-                  <Box key={cita.id}>
-                    <ListItem alignItems="flex-start" sx={{ px: 0 }}>
-                      <ListItemText
-                        primary={
-                          <Box>
-                            <Typography variant="subtitle1" component="span" fontWeight="bold">
-                              {cita.tratamiento}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              color="primary"
-                              sx={{ ml: 2, display: 'inline' }}
-                            >
-                              {formatearFechaHora(cita.fechaHora)}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={
-                          <Box sx={{ mt: 1 }}>
-                            {cita.notas && (
-                              <Typography variant="body2" color="text.secondary">
-                                <strong>Notas:</strong> {cita.notas}
+                {citas.map((cita, idx) => {
+                  // Encuentro el servicio en el catálogo
+                  const svc = servicios.find(s => s.id === cita.service_id)
+                  return (
+                    <Box key={cita.id}>
+                      <ListItem alignItems="flex-start" sx={{ px: 0 }}>
+                        <ListItemText
+                          primary={
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {`Cita #${idx + 1}: ${formatearFechaHora(cita.appointmentAt)}`}
                               </Typography>
-                            )}
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ mt: 0.5, display: 'block' }}
-                            >
-                              Registro de cita: {cita.creadoEn.toLocaleString('es-ES')}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                    {idx < citas.length - 1 && <Divider />}
-                  </Box>
-                ))}
+                              <Typography
+                                variant="body1"
+                                color="primary"
+                                sx={{ display: 'inline', fontWeight: "bold" }}
+                              >
+                                {cita.tratamiento}
+                              </Typography>
+                            </Box>
+                          }
+                          secondary={
+                            <Box sx={{ mt: 1 }}>
+                              {cita.observaciones && (
+                                <Typography variant="body2" color="text.secondary">
+                                  <strong>Observaciones:</strong> {cita.observaciones}
+                                </Typography>
+                              )}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 0.5, display: 'block' }}
+                              >
+                                Registrado: {formatearFechaHora(cita.createdAt)}
+                              </Typography>
+                            </Box>
+                          }
+                        />
+                      </ListItem>
+                      {idx < citas.length - 1 && <Divider />}
+                    </Box>
+                  )
+                })}
               </List>
             )}
           </Paper>
@@ -167,31 +202,36 @@ export default function CitasClient({ paciente }) {
             <TextField
               label="Fecha y Hora"
               type="datetime-local"
-              value={nuevaCita.fechaHora}
-              onChange={handleInputChange('fechaHora')}
+              value={form.appointment_at}
+              onChange={handleChange('appointment_at')}
               fullWidth
               margin="normal"
               InputLabelProps={{ shrink: true }}
               required
             />
+            <FormControl fullWidth margin="normal" required>
+              <InputLabel>Tratamiento</InputLabel>
+              <Select
+                value={form.service_id}
+                onChange={handleChange('service_id')}
+                label="Tratamiento"
+              >
+                {servicios.map(s => (
+                  <MenuItem key={s.id} value={s.id}>
+                    {s.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
-              label="Tratamiento"
-              value={nuevaCita.tratamiento}
-              onChange={handleInputChange('tratamiento')}
-              fullWidth
-              margin="normal"
-              required
-              placeholder="Ej: Limpieza dental, Consulta general..."
-            />
-            <TextField
-              label="Notas"
-              value={nuevaCita.notas}
-              onChange={handleInputChange('notas')}
+              label="Observaciones"
+              value={form.observaciones}
+              onChange={handleChange('observaciones')}
               fullWidth
               margin="normal"
               multiline
               rows={4}
-              placeholder="Observaciones adicionales..."
+              placeholder="Comentarios adicionales..."
             />
           </Box>
         </DialogContent>
@@ -202,6 +242,6 @@ export default function CitasClient({ paciente }) {
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Container>
   )
 }
