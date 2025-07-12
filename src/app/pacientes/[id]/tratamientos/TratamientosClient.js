@@ -177,7 +177,7 @@ export default function TratamientosClient({ patientId: id }) {
   };
 
   return (
-    <div className="mx-auto max-w-screen-lg px-4 py-8">
+    <div className="container mx-auto px-8 py-8">
       {loading ? (
         <Typography variant="h5" gutterBottom>
           Cargando...

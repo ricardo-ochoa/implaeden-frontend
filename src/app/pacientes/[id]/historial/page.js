@@ -131,7 +131,7 @@ export default function PatientDetail({ params: paramsPromise }) {
   const existRecords = clinicalRecords.length > 0;
 
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
       {loading ? (
         <Typography variant="h5" gutterBottom>
           Cargando...

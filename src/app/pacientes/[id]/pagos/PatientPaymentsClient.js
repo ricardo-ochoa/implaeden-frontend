@@ -3,6 +3,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  CircularProgress,
   Skeleton,
   Paper,
   Table,
@@ -52,11 +56,19 @@ export default function PatientPaymentsClient({ paciente, pagosData }) {
   const generatePDF = useGeneratePaymentPDF()
 
   // Hooks para CRUD
-  const { createPayment, updatePayment, deletePayment } = usePayments(pacienteId)
+  const {
+     payments,
+     loading: hookLoading,
+     error: hookError,
+     refresh: fetchPayments,
+     createPayment,
+     updatePayment,
+     deletePayment, } = usePayments(pacienteId)
 
   // Estado local
-  const [payments, setPayments] = useState(pagosData || [])
+  // const [payments, setPayments] = useState(pagosData || [])
   const [loading, setLoading]   = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
   const [error, setError]       = useState(null)
 
   // Modales y alerts
@@ -88,12 +100,33 @@ export default function PatientPaymentsClient({ paciente, pagosData }) {
       }))))
   }, [pacienteId])
 
+  const handleSendEmail = async (payment) => {
+  if (!paciente.email) return
+  setSendingEmail(true)
+  try {
+    const pdf = await generatePDF(payment, paciente, true)
+    const fd = new FormData()
+    fd.append('pdf', pdf, `Factura_${payment.numero_factura}.pdf`)
+    fd.append('to', paciente.email)
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/email/enviar-factura`,
+      { method: 'POST', body: fd }
+    )
+    setEmailAlert({ open: true, success: res.ok, message: res.ok ? 'Enviado' : 'Falló' })
+  } catch {
+    setEmailAlert({ open: true, success: false, message: 'Error al enviar' })
+  } finally {
+    setSendingEmail(false)
+  }
+}
+
+
   // Handlers CRUD
   const handleCreate = async (data) => {
     setLoading(true)
     try {
-      const nuevo = await createPayment(data)
-      setPayments(prev => [...prev, nuevo])
+      await createPayment(data)
+      // await fetchPayments()    // recarga listados
       setOpenCreateModal(false)
     } catch {
       setError('No se pudo crear el pago')
@@ -105,23 +138,9 @@ export default function PatientPaymentsClient({ paciente, pagosData }) {
 const handleUpdate = async (data) => {
   setLoading(true)
   try {
-    await updatePayment(data)  // lanzas la petición, no necesitas el valor devuelto
-
-    // now update local state using the data we already have:
-    setPayments(prev =>
-      prev.map(p => {
-        if (p.id === data.id) {
-          // opcional: recalcula el nombre del tratamiento
-          const svc = servicios.find(s => s.id === data.patient_service_id)
-          return {
-            ...p,
-            ...data,
-            tratamiento: svc?.name || p.tratamiento,
-          }
-        }
-        return p
-      })
-    )
+    // El hook hace el setPayments internamente
+    await updatePayment(data)
+    setOpenEditModal(false)
   } catch {
     setError('No se pudo actualizar el pago')
   } finally {
@@ -129,20 +148,20 @@ const handleUpdate = async (data) => {
   }
 }
 
-  const handleDelete = async () => {
-    if (!selectedPayment) return
-    setLoading(true)
-    try {
-      await deletePayment(selectedPayment.id)
-      setPayments(prev => prev.filter(p => p.id!==selectedPayment.id))
-      setConfirmDeleteOpen(false)
-      setDetailsOpen(false)
-    } catch {
-      setError('No se pudo eliminar el pago')
-    } finally {
-      setLoading(false)
-    }
+const handleDelete = async () => {
+  if (!selectedPayment) return
+  setLoading(true)
+  try {
+    await deletePayment(selectedPayment.id)
+    setConfirmDeleteOpen(false)
+    setDetailsOpen(false)
+  } catch {
+    setError('No se pudo eliminar el pago')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   // Formatea moneda y fecha
   const formatCurrency = amt =>
@@ -181,8 +200,10 @@ const handleUpdate = async (data) => {
   })
   const paginated = filtered.slice(page*rowsPerPage, page*rowsPerPage+rowsPerPage)
 
+  console.log(paginated)
+
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
       <SectionTitle
         title={`Historial de Pagos: ${paciente.nombre} ${paciente.apellidos}`}
         breadcrumbs={[
@@ -297,17 +318,7 @@ const handleUpdate = async (data) => {
                         <IconButton onClick={()=>generatePDF(p,paciente)}>
                           <DownloadIcon fontSize="small"/>
                         </IconButton>
-                        <IconButton
-                          onClick={async ()=>{
-                            const pdf = await generatePDF(p,paciente,true)
-                            const fd = new FormData()
-                            fd.append('pdf',pdf,`Factura_${p.numero_factura}.pdf`)
-                            fd.append('to',paciente.email)
-                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/email/enviar-factura`,{method:'POST',body:fd})
-                            setEmailAlert({ open:true, success:res.ok, message: res.ok?'Enviado':'Falló' })
-                          }}
-                          disabled={!paciente.email}
-                        >
+                        <IconButton onClick={() => handleSendEmail(p)} disabled={!paciente.email}>
                           <EmailIcon fontSize="small"/>
                         </IconButton>
                         <IconButton onClick={()=>{ setEditPayment(p); setOpenEditModal(true) }}>
@@ -383,6 +394,14 @@ const handleUpdate = async (data) => {
         onClose={()=>setConfirmDeleteOpen(false)}
         onConfirm={handleDelete}
       />
+
+      <Dialog open={sendingEmail} PaperProps={{ sx: { p: 2, textAlign: 'center' } }}>
+        <DialogTitle>Enviando email…</DialogTitle>
+        <DialogContent sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+          <CircularProgress />
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }

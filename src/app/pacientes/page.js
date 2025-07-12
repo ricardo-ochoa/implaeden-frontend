@@ -59,7 +59,7 @@ export default function PatientManagement() {
         </Typography>
 
         <main>
-          <div className="container mx-auto max-w-screen-lg px-4 py-8">
+          <div className="container mx-auto px-4 py-8">
             <HomeActions
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm} // Actualiza el término de búsqueda

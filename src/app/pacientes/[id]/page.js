@@ -72,7 +72,7 @@ export default function PatientDetail({ params: paramsPromise }) {
   ));
 
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
       {loading ? (
         <>
         <Skeleton variant="text" width="20%" height={50} />

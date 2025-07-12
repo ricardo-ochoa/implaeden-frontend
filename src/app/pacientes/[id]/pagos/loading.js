@@ -2,7 +2,7 @@ import { Box, Skeleton, Paper, Table, TableBody, TableCell, TableContainer, Tabl
 
 export default function Loading() {
   return (
-    <div className="container mx-auto max-w-screen-lg px-4 py-8">
+    <div className="container mx-auto px-4 py-8">
       <Skeleton variant="text" width="20%" height={50} />
       <Skeleton variant="text" width="20%" height={20} />
       <Skeleton variant="text" width="50%" height={50} sx={{ marginBottom: 4 }} />
