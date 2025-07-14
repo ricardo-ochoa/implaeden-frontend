@@ -13,7 +13,7 @@ import {
   IconButton,
   Box,
 } from '@mui/material';
-import { Description } from '@mui/icons-material';
+import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 import { useRouter } from 'next/navigation';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
 import { useMemo } from 'react';
@@ -21,29 +21,35 @@ import { useMemo } from 'react';
 export default function PatientTable({ patients = [] }) {
   const router = useRouter();
 
-  // Generar avatares aleatorios para pacientes que no tienen una foto de perfil
-  const randomAvatar = useRandomAvatar(); // Llamar al hook una sola vez
-  const patientsWithAvatars = useMemo(() => {
-    return patients.map((patient) => ({
-      ...patient,
-      avatarUrl: patient.foto_perfil_url || randomAvatar,
-    }));
-  }, [patients, randomAvatar]);
+  // Generar avatares aleatorios
+  const randomAvatar = useRandomAvatar();
+  const patientsWithAvatars = useMemo(
+    () =>
+      patients.map((patient) => ({
+        ...patient,
+        avatarUrl: patient.foto_perfil_url || randomAvatar,
+      })),
+    [patients, randomAvatar]
+  );
 
   const handleNavigateToDetails = (patientId) => {
     router.push(`/pacientes/${patientId}`);
   };
 
+  const handleNavigateToCitas = (patientId) => {
+    router.push(`/pacientes/${patientId}/citas`);
+  };
+
   return (
-    <TableContainer component={Paper} elevation={1} sx={{ overflowX: 'auto', marginBottom: 2 }}>
+    <TableContainer component={Paper} elevation={1} sx={{ overflowX: 'auto', mb: 2 }}>
       <Table sx={{ minWidth: 650 }}>
-        <TableHead sx={{ backgroundColor: "#F1F1F5", paddingX: "10px" }}>
+        <TableHead sx={{ backgroundColor: "#F1F1F5", px: 1 }}>
           <TableRow>
-            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>NOMBRE</TableCell>
-            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>TELÉFONO</TableCell>
-            <TableCell sx={{ fontWeight: 600, padding: '10px' }}>EMAIL</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600, padding: '10px' }}>
-              HISTORIAL CLÍNICO
+            <TableCell sx={{ fontWeight: 600, p: '10px' }}>NOMBRE</TableCell>
+            <TableCell sx={{ fontWeight: 600, p: '10px' }}>TELÉFONO</TableCell>
+            <TableCell sx={{ fontWeight: 600, p: '10px' }}>EMAIL</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 600, p: '10px' }}>
+              CITAS
             </TableCell>
           </TableRow>
         </TableHead>
@@ -55,15 +61,15 @@ export default function PatientTable({ patients = [] }) {
               sx={{ cursor: 'pointer' }}
               onClick={() => handleNavigateToDetails(patient.id)}
             >
-              <TableCell sx={{ padding: '9px' }}>
-                <Box className="flex items-center gap-2">
+              <TableCell sx={{ p: '9px' }}>
+                <Box display="flex" alignItems="center" gap={1}>
                   <Avatar
                     src={patient.avatarUrl}
                     alt={`${patient.nombre} ${patient.apellidos}`}
                     sx={{ cursor: 'pointer' }}
                     title={`Ver detalles de ${patient.nombre} ${patient.apellidos}`}
                     onClick={(e) => {
-                      e.stopPropagation(); // Evita que se dispare el evento del TableRow
+                      e.stopPropagation();
                       handleNavigateToDetails(patient.id);
                     }}
                   />
@@ -72,23 +78,23 @@ export default function PatientTable({ patients = [] }) {
                   </Typography>
                 </Box>
               </TableCell>
-              <TableCell sx={{ typography: 'body1',fontWeight: 550, padding: '8px' }}>
+              <TableCell sx={{ typography: 'body1', fontWeight: 550, p: '8px' }}>
                 {patient.telefono || 'N/A'}
               </TableCell>
-              <TableCell sx={{ padding: '8px', typography: 'body1', fontWeight: 550 }}>
+              <TableCell sx={{ p: '8px', typography: 'body1', fontWeight: 550 }}>
                 {patient.email || 'N/A'}
               </TableCell>
-              <TableCell align="right" sx={{ padding: '8px'  }}>
+              <TableCell align="right" sx={{ p: '8px' }}>
                 <IconButton
                   size="small"
                   color="default"
-                  title={`Ver historial clínico de ${patient.nombre}`}
+                  title={`Ver historial de citas de ${patient.nombre}`}
                   onClick={(e) => {
-                    e.stopPropagation(); // Evita que el clic navegue al detalle
-                    // Agrega lógica adicional para ver historial clínico
+                    e.stopPropagation(); // no dispare onClick del row
+                    handleNavigateToCitas(patient.id);
                   }}
                 >
-                  <Description fontSize="small" />
+                  <EditCalendarIcon fontSize="small" />
                 </IconButton>
               </TableCell>
             </TableRow>
