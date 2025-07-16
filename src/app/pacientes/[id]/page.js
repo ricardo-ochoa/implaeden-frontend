@@ -5,6 +5,7 @@ import { Box, Skeleton } from '@mui/material';
 import SectionTitle from '@/components/SectionTitle';
 import BasicInfoCard from '@/components/BasicInfoCard';
 import GeneralCard from '@/components/GeneralCard';
+import api from '../../../../lib/api';
 
 export default function PatientDetail({ params: paramsPromise }) {
   const params = use(paramsPromise);
@@ -17,13 +18,8 @@ export default function PatientDetail({ params: paramsPromise }) {
     const fetchPatient = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pacientes/${id}`);
-
-        if (!response.ok) {
-          throw new Error(`Error en la respuesta: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        // Llama a tu backend con el token en el header
+        const { data } = await api.get(`/pacientes/${id}`);
         setPatient(data);
       } catch (err) {
         console.error('Error fetching patient:', err);

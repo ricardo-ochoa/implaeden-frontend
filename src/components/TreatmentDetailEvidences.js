@@ -31,6 +31,8 @@ export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
     deleteEvidence,
   } = useTreatmentEvidences({ patientId, treatmentId });
 
+  console.log(evidences)
+
   const [modalOpen, setModalOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [startIndex, setStartIndex] = useState(0);

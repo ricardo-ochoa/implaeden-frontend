@@ -1,0 +1,33 @@
+import api from '../api'   // tu instancia de axios con baseURL y token
+
+// Obtener todos los pacientes
+export const fetchPacientes = async (searchTerm) => {
+  const { data } = await api.get('/pacientes', {
+    params: { search: searchTerm }
+  });
+  return data;
+};
+
+// Obtener un paciente por ID
+export const fetchPacienteById = async (id) => {
+  const { data } = await api.get(`/pacientes/${id}`);
+  return data;
+};
+
+// Crear un nuevo paciente
+export const createPaciente = async (pacienteData) => {
+  const { data } = await api.post('/pacientes', pacienteData);
+  return data;
+};
+
+// Actualizar un paciente
+export const updatePaciente = async (id, pacienteData) => {
+  const { data } = await api.put(`/pacientes/${id}`, pacienteData);
+  return data;
+};
+
+// Eliminar un paciente
+export const deletePaciente = async (id) => {
+  const { data } = await api.delete(`/pacientes/${id}`);
+  return data;
+};

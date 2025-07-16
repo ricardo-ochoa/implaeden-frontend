@@ -1,5 +1,6 @@
-// app/pacientes/[id]/tratamientos/TratamientosClient.js
+// src/app/pacientes/[id]/tratamientos/TratamientosClient.js
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -15,13 +16,13 @@ import SectionTitle from '@/components/SectionTitle';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import 'lightgallery/css/lightgallery.css';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
-
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import ModalServicio from '@/components/ModalServicio';
 import TreatmentCard from '@/components/TreatmentCard';
 import UpdateStatusModal from '@/components/UpdateStatusModal';
 import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments';
+import api from '../../../../../lib/api'; // import axios client
 
 export default function TratamientosClient({ patientId: id }) {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function TratamientosClient({ patientId: id }) {
   const [newRecordFiles, setNewRecordFiles] = useState([]);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [menuRecord, setMenuRecord] = useState(null);
-  const [selectedService, setSelectedService] = useState('')
+  const [selectedService, setSelectedService] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
@@ -45,14 +46,23 @@ export default function TratamientosClient({ patientId: id }) {
 
   const defaultAvatar = useRandomAvatar();
 
+  useEffect(() => {
+    const fetchPatient = async () => {
+      try {
+        // Usamos axios y api client para incluir token
+        const { data } = await api.get(`/pacientes/${id}`);
+        setPatient(data);
+      } catch (err) {
+        console.error('Error fetching patient:', err);
+      }
+    };
+    if (id) fetchPatient();
+  }, [id]);
+
+  console.log(treatments)
+
   const handleDeleteRecord = async () => {
-    if (!recordToDelete || !recordToDelete.treatment_id) {
-      console.error('recordToDelete no está definido o no tiene un treatment_id válido.');
-      return;
-    }
-  
-    console.log('Eliminando tratamiento con ID:', recordToDelete.treatment_id);
-  
+    if (!recordToDelete?.treatment_id) return;
     try {
       await deleteTreatment(recordToDelete.treatment_id);
       setIsDeleteModalOpen(false);
@@ -68,28 +78,10 @@ export default function TratamientosClient({ patientId: id }) {
     }
   };
 
-  useEffect(() => {
-    const fetchPatient = async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pacientes/${id}`);
-        if (!response.ok) {
-          throw new Error(`Error en la respuesta: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        setPatient(data);
-      } catch (err) {
-        console.error('Error fetching patient:', err);
-      }
-    };
-
-    if (id) fetchPatient();
-  }, [id]);
-
   const handleMenuOpen = (event, record) => {
     setMenuAnchorEl(event.currentTarget);
     setMenuRecord(record);
-  }
-
+  };
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
     setMenuRecord(null);
@@ -102,24 +94,13 @@ export default function TratamientosClient({ patientId: id }) {
   };
 
   const handleSaveRecord = async () => {
-    if (!newRecordDate || !selectedService) {
-      return;
-    }
-  
+    if (!newRecordDate || !selectedService) return;
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/patient/${id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service_id: selectedService,
-          service_date: newRecordDate,
-          total_cost: initialCost,    
-        }),
+      await api.post(`/servicios/patient/${id}`, {
+        service_id: selectedService,
+        service_date: newRecordDate,
+        total_cost: initialCost,
       });
-  
-      if (!response.ok) throw new Error('Error al guardar el tratamiento.');
       setIsModalOpen(false);
       setNewRecordDate('');
       setSelectedService('');
@@ -138,20 +119,11 @@ export default function TratamientosClient({ patientId: id }) {
 
   const handleSaveStatus = async () => {
     if (!selectedTreatment?.treatment_id || !newStatus) return;
-  
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/tratamientos/${selectedTreatment.treatment_id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-  
-      if (!res.ok) throw new Error('Error al actualizar el estado');
-  
+      await api.put(`/servicios/tratamientos/${selectedTreatment.treatment_id}/status`, { status: newStatus });
       setStatusModalOpen(false);
       setSelectedTreatment(null);
-      setNewStatus('');
-      fetchPatientTreatments(); // refrescar
+      fetchPatientTreatments();
       setSnackbarMessage('Estado actualizado correctamente.');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
@@ -162,26 +134,16 @@ export default function TratamientosClient({ patientId: id }) {
       setSnackbarOpen(true);
     }
   };
-  
 
   const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
-
-  const avatarUrl = patient?.foto_perfil_url
-    ? `${patient.foto_perfil_url}`
-    : defaultAvatar;
-
+  const avatarUrl = patient?.foto_perfil_url || defaultAvatar;
   const existRecords = treatments.length > 0;
-
-  const handleCardClick = (treatmentId) => {
-    router.push(`/pacientes/${id}/tratamientos/${treatmentId}`);
-  };
+  const handleCardClick = (treatmentId) => router.push(`/pacientes/${id}/tratamientos/${treatmentId}`);
 
   return (
     <div className="container mx-auto px-8 py-8">
-      {loading ? (
-        <Typography variant="h5" gutterBottom>
-          Cargando...
-        </Typography>
+            {loading ? (
+        <Typography variant="h5" gutterBottom>Cargando...</Typography>
       ) : (
         <SectionTitle
           title={`Tratamientos - ${patientName}`}
