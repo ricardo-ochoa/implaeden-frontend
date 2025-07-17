@@ -1,38 +1,60 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
-import { use, useEffect, useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+
 import {
   Avatar,
   Box,
   Button,
   Card,
   CardContent,
+  CardActions,
   CardMedia,
   IconButton,
   Menu,
   MenuItem,
   Typography,
+  CircularProgress,
+  Alert,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  Snackbar,
 } from '@mui/material';
-import SectionTitle from '@/components/SectionTitle';
+import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ShareIcon from '@mui/icons-material/Share';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import LightGallery from 'lightgallery/react';
 import 'lightgallery/css/lightgallery.css';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import useClinicalHistories from '../../../../../lib/hooks/useClinicalHistories';
+import SectionTitle from '@/components/SectionTitle';
 import UploadFilesModal from '@/components/UploadFilesModal';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
-import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import ShareIcon from '@mui/icons-material/Share';
+import api from '../../../../../lib/api';
+import useClinicalHistories from '../../../../../lib/hooks/useClinicalHistories';
 import useDeleteClinicalHistory from '../../../../../lib/hooks/useDeleteClinicalHistory';
+import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
 import { formatDate } from '../../../../../lib/utils/formatDate';
 
-export default function PatientDetail({ params: paramsPromise }) {
-  const params = use(paramsPromise);
-  const { id } = params;
-  const { clinicalRecords, loading, fetchClinicalHistories } = useClinicalHistories(id);
-  const { deleteClinicalHistory, loading: deleting, error } = useDeleteClinicalHistory(fetchClinicalHistories);
+export default function PatientHistoryPage() {
+  const { id: patientId } = useParams();
+  const defaultAvatar = useRandomAvatar();
+
+  const {
+    clinicalRecords,
+    loading: historiesLoading,
+    error: historiesError,
+    fetchClinicalHistories,
+    addClinicalHistory,
+  } = useClinicalHistories(patientId);
+
+  const {
+    deleteClinicalHistory,
+    loading: deleting,
+    error: deleteError,
+  } = useDeleteClinicalHistory(fetchClinicalHistories);
 
   const [patient, setPatient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,262 +64,241 @@ export default function PatientDetail({ params: paramsPromise }) {
   const [newRecordFiles, setNewRecordFiles] = useState([]);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const [menuRecord, setMenuRecord] = useState(null);
-  const defaultAvatar = useRandomAvatar();
+
+  // preview
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
 
   useEffect(() => {
-    fetchClinicalHistories();
-  }, [id]);
-
-  const handleDeleteRecord = async () => {
-    if (!recordToDelete) return;
-    await deleteClinicalHistory(recordToDelete.id);
-    setIsDeleteModalOpen(false);
-    setRecordToDelete(null);
-  };
+    if (patientId) fetchClinicalHistories();
+  }, [patientId, fetchClinicalHistories]);
 
   useEffect(() => {
-    const fetchPatient = async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pacientes/${id}`);
-        if (!response.ok) {
-          throw new Error(`Error en la respuesta: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        setPatient(data);
-      } catch (err) {
-        console.error('Error fetching patient:', err);
-      }
-    };
+    async function loadPatient() {
+      const { data } = await api.get(`/pacientes/${patientId}`);
+      setPatient(data);
+    }
+    if (patientId) loadPatient();
+  }, [patientId]);
 
-    if (id) fetchPatient();
-  }, [id]);
+  const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
+  const avatarUrl = patient?.foto_perfil_url || defaultAvatar;
 
-  const groupedRecords = clinicalRecords.reduce((acc, record) => {
-    const date = record.record_date.split('T')[0];
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(record);
+  // Agrupar por fecha
+  const groupedRecords = clinicalRecords.reduce((acc, rec) => {
+    const date = rec.record_date.split('T')[0];
+    acc[date] = acc[date] || [];
+    acc[date].push(rec);
     return acc;
   }, {});
 
-  const handleMenuOpen = (event, record) => {
-    setMenuAnchorEl(event.currentTarget);
-    setMenuRecord(record);
+  // Helper para renderizar cada Card
+  const renderHistoryCard = (date, records) => {
+    return (
+      <Card
+        key={date}
+        sx={{
+          borderRadius: 2,
+          width: { xs: '100%', md: '45%', lg: '30%' },
+          border: '2px solid transparent',
+          '&:hover': { border: '2px solid #B2C6FB' },
+          cursor: 'pointer',
+        }}
+      >
+        <CardContent>
+          {/* Avatares y nombre */}
+          <Box display="flex" alignItems="center" mb={2} gap={1}>
+            <Avatar src={avatarUrl} />
+            <Typography>{patientName}</Typography>
+          </Box>
+          {/* Título: fecha */}
+          <Typography fontWeight="bold" gutterBottom>
+            Expediente fecha: {formatDate(date)}
+          </Typography>
+          {/* Thumbnails */}
+          <Box display="flex" flexDirection="column" gap={1}>
+            {records.map(rec => {
+              const isPdf = rec.file_url.endsWith('.pdf');
+              return (
+                <Box
+                  key={rec.id}
+                  position="relative"
+                  onClick={() => {
+                    setPreviewOpen(true);
+                    setPreviewFile({
+                      preview: rec.file_url,
+                      type: isPdf ? 'application/pdf' : 'image/jpeg',
+                      name: `hist-${rec.id}`,
+                    });
+                  }}
+                  sx={{
+                    width: '100%',
+                    height: isPdf ? 120 : 80,
+                    overflow: 'hidden',
+                    borderRadius: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  {isPdf ? (
+                    <object
+                      data={rec.file_url}
+                      type="application/pdf"
+                      width="100%"
+                      height="100%"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  ) : (
+                    <CardMedia
+                      component="img"
+                      src={rec.file_url}
+                      alt="Evidencia"
+                      sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  )}
+                  <IconButton
+                    onClick={e => {
+                      e.stopPropagation();
+                      setRecordToDelete(rec);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    color="error"
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      backgroundColor: 'rgba(255,255,255,0.7)',
+                    }}
+                  >
+                    <DeleteForeverIcon />
+                  </IconButton>
+                </Box>
+              );
+            })}
+          </Box>
+        </CardContent>
+
+        <CardActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            variant={records.length > 0 ? 'outlined' : 'contained'}
+            startIcon={<UploadFileIcon />}
+            onClick={() => setIsModalOpen(true)}
+          >
+            {records.length > 0 ? 'Actualizar' : 'Subir'}
+          </Button>
+          {/* 
+          <IconButton color="primary">
+            <ShareIcon />
+          </IconButton> */}
+        </CardActions>
+      </Card>
+    );
   };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setMenuRecord(null);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setNewRecordDate('');
-    setNewRecordFiles([]);
-  };
-
-  const handleSaveRecord = async () => {
-    if (!newRecordDate || newRecordFiles.length === 0) {
-      alert('Por favor, completa todos los campos.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('record_date', newRecordDate);
-    newRecordFiles.forEach((file) => formData.append('files', file));
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clinical-histories/${id}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error('Error al guardar el historial clínico.');
-
-      await response.json();
-      fetchClinicalHistories();
-      handleCloseModal();
-    } catch (err) {
-      console.error('Error al guardar el historial clínico:', err);
-      alert('Error al guardar el historial clínico.');
-    }
-  };
-
-  const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
-
-  const avatarUrl = patient?.foto_perfil_url
-    ? `${patient.foto_perfil_url}`
-    : defaultAvatar;
-
-  const existRecords = clinicalRecords.length > 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {loading ? (
-        <Typography variant="h5" gutterBottom>
-          Cargando...
-        </Typography>
+    <Box className="container mx-auto px-4 py-8">
+      {/* Carga y alertas */}
+      <Dialog open={isSaving}>
+        <DialogContent sx={{ textAlign: 'center', p: 4 }}>
+          <CircularProgress sx={{ mb: 2 }} />
+          <Typography>Cargando documento…</Typography>
+        </DialogContent>
+      </Dialog>
+      <Snackbar
+          open={showSuccess}
+          autoHideDuration={3000}
+          onClose={() => setShowSuccess(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={() => setShowSuccess(false)}
+            severity="success"
+            sx={{ width: '100%' }}
+          >
+            Expediente guardado
+          </Alert>
+        </Snackbar>
+
+      {/* Título */}
+      {historiesLoading ? (
+        <CircularProgress />
       ) : (
         <SectionTitle
-          title={`${patientName} - Historial clínico`}
+          title={`${patientName} — Historial clínico`}
           breadcrumbs={[
             { label: 'Pacientes', href: '/pacientes' },
-            { label: patientName, href: `/pacientes/${id}` },
-            { label: 'Historial clínico', href: `/pacientes/${id}/historial` },
+            { label: patientName, href: `/pacientes/${patientId}` },
+            { label: 'Historial clínico' },
           ]}
         />
       )}
+      {(historiesError || deleteError) && (
+        <Alert severity="error">{historiesError || deleteError}</Alert>
+      )}
 
-      <Box className="grid gap-4">
-        {existRecords ? (
-          <Typography variant="h6">Historiales clínicos registrados:</Typography>
-        ) : (
-          <Typography variant="h6">No hay historiales registrados:</Typography>
+      {/* Grid de Cards */}
+      <Box display="flex" flexWrap="wrap" gap={2} mt={4}>
+        {Object.entries(groupedRecords).map(([date, recs]) =>
+          renderHistoryCard(date, recs)
         )}
-
-        <Box display="flex" flexWrap="wrap" gap={2}>
-          {Object.entries(groupedRecords).map(([date, records]) => (
-            <Card
-              key={date}
-              sx={{
-                borderRadius: '10px',
-                width: { xs: '100%', md: '40%', lg: 300 },
-                cursor: 'pointer',
-                border: '2px solid transparent',
-                transition: 'border-color 0.3s, box-shadow 0.3s',
-                '&:hover': {
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-                  border: '2px solid #B2C6FB',
-                  backgroundColor: '#F5F7FB',
-                },
-              }}
-            >
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar src={avatarUrl} alt="Paciente" />
-                    <Typography variant="body1" fontWeight="bold">
-                      {patientName}
-                    </Typography>
-                  </Box>
-                  <IconButton onClick={(e) => handleMenuOpen(e, records[0])}>
-                    <MoreVertIcon />
-                  </IconButton>
-                </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
-                    Historial Clínico
-                  </Typography>
-                <Box display="flex">
-                  <Typography variant="body2" sx={{ fontWeight: 600, marginRight: 1 }}>
-                    Fecha:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDate(date)}
-                  </Typography>
-                </Box>
-                <Box mt={2}>
-                  {records
-                    .filter((record) => record.file_url.endsWith('.pdf'))
-                    .map((record, index) => (
-                      <a
-                        key={index}
-                        href={record.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <PictureAsPdfIcon
-                          sx={{
-                            fontSize: 40,
-                            cursor: 'pointer',
-                            color: 'primary.main',
-                            marginRight: '8px',
-                          }}
-                        />
-                      </a>
-                    ))}
-
-                  <LightGallery selector="a" download={false}>
-                    <Box display="flex" flexWrap="wrap" gap={1}>
-                      {records
-                        .filter((record) => !record.file_url.endsWith('.pdf'))
-                        .map((record, index) => (
-                          <a
-                            key={index}
-                            data-src={record.file_url}
-                            href={record.file_url}
-                          >
-                            <CardMedia
-                              component="img"
-                              image={record.file_url}
-                              alt="Evidencia"
-                              sx={{
-                                width: 50,
-                                height: 50,
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                transition: 'border-color 0.3s, box-shadow 0.3s',
-                                '&:hover': {
-                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-                                  cursor: 'pointer',
-                                },
-                              }}
-                            />
-                          </a>
-                        ))}
-                    </Box>
-                  </LightGallery>
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
-
-          <Button
-            sx={{ width: { xs: '100%', md: '40%', lg: 300 } }}
-            variant="outlined"
-            onClick={() => setIsModalOpen(true)}
-            startIcon={<UploadFileIcon />}
-          >
-            Agregar nuevo historial
-          </Button>
-        </Box>
       </Box>
 
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => {}}> <ShareIcon sx={{ mr: 1}} color='info'/> Compartir</MenuItem>
-        <MenuItem
-          onClick={() => {
-            setRecordToDelete(menuRecord);
-            setIsDeleteModalOpen(true);
-            handleMenuClose();
-          }}
-        >
-        <DeleteForeverIcon sx={{ mr: 1}} color='error'/>  Eliminar
-        </MenuItem>
-      </Menu>
+      {/* Dialog de preview */}
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="xl">
+        <DialogActions>
+          <IconButton onClick={() => setPreviewOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogActions>
+        <DialogContent sx={{ height: '80vh', p: 0 }}>
+          {previewFile?.type === 'application/pdf' ? (
+            <iframe
+              src={previewFile?.preview}
+              title={previewFile?.name}
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={previewFile?.preview}
+              alt={previewFile?.name}
+              sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
+      {/* Modales de subir y eliminar */}
       <UploadFilesModal
         open={isModalOpen}
-        onClose={handleCloseModal}
-        title="Nuevo historial clínico:"
+        onClose={() => setIsModalOpen(false)}
+        title="Nuevo Historial Clínico"
         newRecordDate={newRecordDate}
         setNewRecordDate={setNewRecordDate}
         setNewRecordFiles={setNewRecordFiles}
-        handleSaveRecord={handleSaveRecord}
+        handleSaveRecord={async () => {
+          if (!newRecordDate || !newRecordFiles.length) return alert('Fecha y archivos obligatorios');
+          setIsSaving(true);
+          await addClinicalHistory(newRecordDate, newRecordFiles);
+          setShowSuccess(true);
+          setIsSaving(false);
+          setIsModalOpen(false);
+        }}
       />
 
       <ConfirmDeleteModal
         open={isDeleteModalOpen}
-        onClose={() => {
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="Eliminar documento"
+        description="¿Seguro que quieres eliminar este archivo?"
+        onConfirm={async () => {
+          await deleteClinicalHistory(recordToDelete.id);
           setIsDeleteModalOpen(false);
-          setRecordToDelete(null);
         }}
-        title="Eliminar historial clínico"
-        description="¿Estás seguro de que quieres eliminar este historial? Esta acción no se puede deshacer."
-        onConfirm={handleDeleteRecord}
       />
-    </div>
+    </Box>
   );
 }

@@ -59,8 +59,6 @@ export default function TratamientosClient({ patientId: id }) {
     if (id) fetchPatient();
   }, [id]);
 
-  console.log(treatments)
-
   const handleDeleteRecord = async () => {
     if (!recordToDelete?.treatment_id) return;
     try {

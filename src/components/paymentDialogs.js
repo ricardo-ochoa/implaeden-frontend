@@ -152,6 +152,15 @@ useEffect(() => {
     setForm({ ...form, [field]: e.target.value });
   };
 
+  const isFormValid = Boolean(
+  form.fecha &&
+  form.patient_service_id &&
+  form.monto !== '' &&
+  form.estado &&
+  form.metodo_pago &&
+  form.notas
+);
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle fontWeight={"bold"}>{initialData ? 'Editar Pago' : 'Nuevo Pago'}</DialogTitle>
@@ -237,12 +246,13 @@ useEffect(() => {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button
+       <Button
           variant="contained"
           onClick={async () => {
-            await onSave(form);
-            onClose();
+            await onSave(form)
+            onClose()
           }}
+          disabled={!isFormValid}
         >
           Guardar
         </Button>
