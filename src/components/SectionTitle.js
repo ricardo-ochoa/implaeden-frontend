@@ -4,7 +4,7 @@ import { Box, Button, Typography, Breadcrumbs, Link } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 
-export default function SectionTitle({ breadcrumbs = [], title }) {
+export default function SectionTitle({ breadcrumbs = [], title, isHome }) {
   const router = useRouter();
 
   const handleBack = () => {
@@ -14,6 +14,8 @@ export default function SectionTitle({ breadcrumbs = [], title }) {
   return (
     <Box sx={{ marginBottom: 4 }}>
       {/* Botón de regresar */}
+      {
+        !isHome && (
       <Button
         variant="text"
         startIcon={<ArrowBackIcon />}
@@ -22,6 +24,8 @@ export default function SectionTitle({ breadcrumbs = [], title }) {
       >
         Regresar
       </Button>
+        )
+      }
 
       {/* Breadcrumbs */}
       <Breadcrumbs aria-label="breadcrumb" separator=" / " sx={{ fontSize: '0.875rem' }}>

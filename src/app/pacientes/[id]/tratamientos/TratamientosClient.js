@@ -12,7 +12,6 @@ import {
   Snackbar,
   Alert
 } from '@mui/material';
-import SectionTitle from '@/components/SectionTitle';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import 'lightgallery/css/lightgallery.css';
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
@@ -24,9 +23,9 @@ import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments';
 import api from '../../../../../lib/api'; // import axios client
 
-export default function TratamientosClient({ patientId: id }) {
+export default function TratamientosClient({ paciente }) {
   const router = useRouter();
-  const { treatments, loading, fetchPatientTreatments, deleteTreatment } = usePatientTreatments(id);
+  const { treatments, loading, fetchPatientTreatments, deleteTreatment } = usePatientTreatments(paciente.id);
   const [patient, setPatient] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -50,14 +49,14 @@ export default function TratamientosClient({ patientId: id }) {
     const fetchPatient = async () => {
       try {
         // Usamos axios y api client para incluir token
-        const { data } = await api.get(`/pacientes/${id}`);
+        const { data } = await api.get(`/pacientes/${paciente.id}`);
         setPatient(data);
       } catch (err) {
         console.error('Error fetching patient:', err);
       }
     };
-    if (id) fetchPatient();
-  }, [id]);
+    if (paciente.id) fetchPatient();
+  }, [paciente]);
 
   const handleDeleteRecord = async () => {
     if (!recordToDelete?.treatment_id) return;
@@ -94,7 +93,7 @@ export default function TratamientosClient({ patientId: id }) {
   const handleSaveRecord = async () => {
     if (!newRecordDate || !selectedService) return;
     try {
-      await api.post(`/servicios/patient/${id}`, {
+      await api.post(`/servicios/patient/${paciente.id}`, {
         service_id: selectedService,
         service_date: newRecordDate,
         total_cost: initialCost,
@@ -133,29 +132,14 @@ export default function TratamientosClient({ patientId: id }) {
     }
   };
 
-  const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim();
-  const avatarUrl = patient?.foto_perfil_url || defaultAvatar;
   const existRecords = treatments.length > 0;
-  const handleCardClick = (treatmentId) => router.push(`/pacientes/${id}/tratamientos/${treatmentId}`);
+  const handleCardClick = (treatmentId) => router.push(`/pacientes/${paciente.id}/tratamientos/${treatmentId}`);
 
   return (
-    <div className="container mx-auto px-8 py-8">
-            {loading ? (
-        <Typography variant="h5" gutterBottom>Cargando...</Typography>
-      ) : (
-        <SectionTitle
-          title={`Tratamientos - ${patientName}`}
-          breadcrumbs={[
-            { label: 'Pacientes', href: '/pacientes' },
-            { label: patientName, href: `/pacientes/${id}` },
-            { label: 'Tratamientos', href: `/pacientes/${id}/tratamientos` },
-          ]}
-        />
-      )}
-
-      <Box className="grid gap-4">
+    <div>
+      <Box className="">
         {existRecords ? (
-          <div className='flex w-full justify-between flex-wrap'>
+          <div className='flex w-full justify-between flex-wrap mb-8'>
           <Typography variant="h6">Tratamientos registrados:</Typography>
           <Button
             sx={{ width: { xs: '100%', md: '40%', lg: 300 }, mt:  { xs: 2, lg: 0 } }}

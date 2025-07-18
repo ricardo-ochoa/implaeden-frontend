@@ -20,6 +20,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { PAYMENT_METHODS } from '../../lib/utils/paymentmethods';
 import { formatDate } from '../../lib/utils/formatDate';
+import { formatCurrency } from '../../lib/utils/formatCurrency';
 
 export function PaymentDetailsDialog({
   open,
@@ -71,7 +72,7 @@ export function PaymentDetailsDialog({
           <Grid item xs={6}>
             <Typography variant="subtitle2" fontWeight={"bold"}>Monto</Typography>
             <Typography>
-              <AttachMoneyIcon fontSize="small" /> {payment.monto} mxn
+              <AttachMoneyIcon fontSize="small" /> {formatCurrency(payment.monto)} mxn
             </Typography>
           </Grid>
           <Grid item xs={6}>
@@ -118,7 +119,7 @@ export function PaymentFormDialog({
       fecha: initialData?.fecha ? initialData.fecha.split('T')[0] : '',
       patient_service_id: initialData?.patient_service_id || '',
       monto: initialData?.monto || '',
-      estado: initialData?.estado || 'pendiente',
+      estado: initialData?.estado || 'abono',
       metodo_pago: initialData?.metodo_pago || '',
       notas: initialData?.notas || '',
     });
@@ -140,7 +141,7 @@ useEffect(() => {
       fecha: '',
       patient_service_id: '',
       monto: '',
-      estado: 'pendiente',
+      estado: 'abono',
       metodo_pago: '',
       notas: '',
     })
@@ -152,7 +153,7 @@ useEffect(() => {
     setForm({ ...form, [field]: e.target.value });
   };
 
-  const isFormValid = Boolean(
+const isFormValid = Boolean(
   form.fecha &&
   form.patient_service_id &&
   form.monto !== '' &&
@@ -160,6 +161,8 @@ useEffect(() => {
   form.metodo_pago &&
   form.notas
 );
+
+console.log(form)
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -193,7 +196,7 @@ useEffect(() => {
           </Grid>
           <Grid item xs={12}>
             <TextField
-              label="Monto"
+              label="Monto mxn"
               type="number"
               value={form.monto}
               onChange={handleChange('monto')}
@@ -202,8 +205,10 @@ useEffect(() => {
           </Grid>
           <Grid item xs={12}>
             <FormControl fullWidth>
-              <InputLabel>Estatus de pago</InputLabel>
+              <InputLabel id="status-label">Estatus de pago</InputLabel>
               <Select
+                labelId="status-label"
+                name="estado"
                 value={form.estado}
                 onChange={handleChange('estado')}
                 label="Estatus de pago"
@@ -212,10 +217,9 @@ useEffect(() => {
                 <MenuItem value="finalizado">Finalizado</MenuItem>
                 <MenuItem value="cancelado">Cancelado</MenuItem>
                 <MenuItem value="reembolsado">Reembolsado</MenuItem>
-                {/* <MenuItem value="pendiente">Pendiente</MenuItem>
-                <MenuItem value="parcial">Parcial</MenuItem> */}
               </Select>
             </FormControl>
+
           </Grid>
           <Grid item xs={12}>
           <FormControl fullWidth>

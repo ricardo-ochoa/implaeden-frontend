@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import {
   Box,
   Button,
-  Container,
   Alert,
   Grid,
   CircularProgress,
@@ -13,13 +12,17 @@ import {
   DialogActions,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
-import SectionTitle from '@/components/SectionTitle'
 import { useCitas } from '../../../../../lib/hooks/useCitas'
 import CitasTable from '@/components/citas/CitasTable'
 import CitaModal from '@/components/citas/CitaModal'
 
-export default function CitasClient({ paciente }) {
+export default function CitasClient({
+  paciente,
+  initialServicios = [],
+  initialCitas = [],
+}) {
   const pacienteId = paciente.id
+  // hook "verdadero" que refresca en backend
   const {
     citas,
     loading: loadingCitas,
@@ -30,13 +33,20 @@ export default function CitasClient({ paciente }) {
     deleteCita,
   } = useCitas(pacienteId)
 
-  const [servicios, setServicios] = useState([])
-  const [modalOpen, setModalOpen] = useState(false)
-  const [mensaje, setMensaje] = useState('')
-  const [selectedCita, setSelectedCita] = useState(null)
+  // 1️⃣ Estado local que arranca con lo traído en SSR
+  const [citasLoad, setCitasLoad] = useState(initialCitas)
+  // y lo re‑sincronizamos cuando el hook trae nuevos datos
+  useEffect(() => {
+    if (!loadingCitas) {
+      setCitasLoad(citas)
+    }
+  }, [citas, loadingCitas])
 
-  // Para el diálogo de confirmación
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [servicios, setServicios] = useState(initialServicios)
+  const [modalOpen, setModalOpen]       = useState(false)
+  const [mensaje, setMensaje]           = useState('')
+  const [selectedCita, setSelectedCita] = useState(null)
+  const [confirmOpen, setConfirmOpen]   = useState(false)
   const [citaToDelete, setCitaToDelete] = useState(null)
 
   const formatearFechaHora = iso =>
@@ -45,14 +55,16 @@ export default function CitasClient({ paciente }) {
       hour: '2-digit', minute: '2-digit',
     })
 
+  // Cuando monta, refresca hook y carga servicios si no vienen por props
   useEffect(() => {
-    if (!pacienteId) return
     refresh()
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`)
-      .then(r => r.json())
-      .then(setServicios)
-      .catch(console.error)
-  }, [pacienteId, refresh])
+    if (!initialServicios.length) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`)
+        .then(r => r.json())
+        .then(setServicios)
+        .catch(console.error)
+    }
+  }, [pacienteId, refresh, initialServicios])
 
   const handleSave = async form => {
     const { appointment_at, service_id } = form
@@ -68,6 +80,7 @@ export default function CitasClient({ paciente }) {
         await createCita(form)
         setMensaje('Cita creada exitosamente')
       }
+      // el refresh dispara el hook y el efecto resetea citasLoad
       return true
     } catch {
       setMensaje('Error guardando la cita')
@@ -82,26 +95,18 @@ export default function CitasClient({ paciente }) {
     setModalOpen(true)
   }
 
-  // En lugar de borrar directamente, abrimos el modal de confirmación
   const handleRequestDelete = id => {
-    const cita = citas.find(c => c.id === id)
+    const cita = citasLoad.find(c => c.id === id)
     setCitaToDelete(cita)
     setConfirmOpen(true)
   }
 
   const handleConfirmDelete = async () => {
-    if (citaToDelete) {
-      await deleteCita(citaToDelete.id)
-      setMensaje('Cita eliminada exitosamente')
-      setTimeout(() => setMensaje(''), 3000)
-    }
+    if (!citaToDelete) return
+    await deleteCita(citaToDelete.id)
+    setMensaje('Cita eliminada exitosamente')
+    setTimeout(() => setMensaje(''), 3000)
     setConfirmOpen(false)
-    setCitaToDelete(null)
-  }
-
-  const handleCancelDelete = () => {
-    setConfirmOpen(false)
-    setCitaToDelete(null)
   }
 
   const handleCloseModal = () => {
@@ -110,25 +115,15 @@ export default function CitasClient({ paciente }) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <SectionTitle
-        title={`Historial de Citas: ${paciente.nombre} ${paciente.apellidos}`}
-        breadcrumbs={[
-          { label: 'Pacientes', href: '/pacientes' },
-          { label: `${paciente.nombre} ${paciente.apellidos}`, href: `/pacientes/${pacienteId}` },
-          { label: 'Citas' },
-        ]}
-      />
-
+    <div>
       {mensaje && (
         <Alert
           severity={mensaje.includes('exitosamente') ? 'success' : 'error'}
           sx={{
             position: 'fixed',
-            top: theme => theme.spacing(2), // un poco de margen desde arriba
-            left: '50%',                 // centrar horizontalmente
+            top: theme => theme.spacing(2),
+            left: '50%',
             transform: 'translateX(-50%)',
-            width: 'auto',               // o un máximo: '90%', '400px', etc.
             zIndex: theme => theme.zIndex.snackbar,
           }}
         >
@@ -144,14 +139,12 @@ export default function CitasClient({ paciente }) {
             top: theme => theme.spacing(10),
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 'auto',
             zIndex: theme => theme.zIndex.snackbar,
           }}
         >
           Error cargando citas: {errorCitas}
         </Alert>
       )}
-
 
       <Grid container>
         <Grid item xs={12} sx={{ textAlign: 'right', mb: 1 }}>
@@ -163,7 +156,6 @@ export default function CitasClient({ paciente }) {
             Nueva Cita
           </Button>
         </Grid>
-
         <Grid item xs={12}>
           {loadingCitas ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -171,17 +163,16 @@ export default function CitasClient({ paciente }) {
             </Box>
           ) : (
             <CitasTable
-              citas={citas}
+              citas={citasLoad}
               servicios={servicios}
               formatearFechaHora={formatearFechaHora}
               onEdit={handleEdit}
-              onDelete={handleRequestDelete}  // ahora abre el confirm
+              onDelete={handleRequestDelete}
             />
           )}
         </Grid>
       </Grid>
 
-      {/* Modal de crear/editar */}
       <CitaModal
         open={modalOpen}
         onClose={handleCloseModal}
@@ -190,21 +181,12 @@ export default function CitasClient({ paciente }) {
         initialData={selectedCita}
       />
 
-      {/* Confirmación de eliminación */}
-      <Dialog open={confirmOpen} onClose={handleCancelDelete}>
-        <DialogTitle>
-          ¿Estás seguro de eliminar este registro de cita?
-        </DialogTitle>
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>¿Confirmas eliminar esta cita?</DialogTitle>
         <DialogActions>
-          <Button onClick={handleCancelDelete}>
-            Cancelar
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={handleConfirmDelete}
-          >
-            Sí, confirmo eliminar
+          <Button onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+          <Button color="error" variant="contained" onClick={handleConfirmDelete}>
+            Eliminar
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,21 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import api from '../../../../../lib/api'
 import { usePayments } from '../../../../../lib/hooks/usePayments'
 import { useGeneratePaymentPDF } from '../../../../../lib/hooks/useGeneratePaymentPDF'
-import SectionTitle from '@/components/SectionTitle'
 import {
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TablePagination,
-  Chip,
   TextField,
   InputAdornment,
   IconButton,
@@ -27,22 +19,10 @@ import {
   MenuItem,
   Snackbar,
   Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  CircularProgress,
-  Skeleton,
 } from '@mui/material'
 import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
-  CalendarToday as CalendarTodayIcon,
-  AttachMoney as AttachMoneyIcon,
-  Visibility as VisibilityIcon,
-  Download as DownloadIcon,
-  Email as EmailIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material'
 import {
   PaymentDetailsDialog,
@@ -50,39 +30,15 @@ import {
   ConfirmDeleteDialog,
 } from '@/components/paymentDialogs'
 import { formatDate } from '../../../../../lib/utils/formatDate'
+import PaymentsTable from '@/components/payments/PaymentsTable'
 
-export default function PatientPaymentsClient() {
+export default function PatientPaymentsClient(
+  {paciente, initialPayments, initialServicios}
+) {
   const { id: pacienteId } = useParams()
   const router = useRouter()
   const generatePDF = useGeneratePaymentPDF()
-
-  // Estado paciente
-  const [paciente, setPaciente] = useState(null)
-  const [pLoading, setPLoading] = useState(true)
-  const [pError, setPError]     = useState(null)
-  
-  useEffect(() => {
-    if (!pacienteId) return
-    setPLoading(true)
-    api.get(`/pacientes/${pacienteId}`)
-      .then(res => setPaciente(res.data))
-      .catch(err => {
-        if (err.response?.status === 401) {
-          router.push('/login')
-        } else {
-          setPError(err.response?.data?.message || err.message)
-        }
-      })
-      .finally(() => setPLoading(false))
-  }, [pacienteId, router])
-
-    // Formatea moneda y fecha
-  const formatCurrency = amt =>
-    new Intl.NumberFormat('es-MX', {
-      style: 'decimal',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amt)
+  const [localPayments, setLocalPayments] = useState(initialPayments);
 
 
   const getStatusColor = st => {
@@ -106,33 +62,11 @@ export default function PatientPaymentsClient() {
     refresh: fetchPayments,
   } = usePayments(pacienteId)
 
-  // Servicios para formularios
-  const [servicios, setServicios]   = useState([])
-  const [servLoading, setServLoading] = useState(true)
-  const [servError,   setServError]   = useState(null)
-
-  useEffect(() => {
-    if (!pacienteId) return
-    setServLoading(true)
-    api.get(`/pacientes/${pacienteId}/tratamientos`)
-      .then(res => {
-        setServicios(
-          res.data.map(t => ({
-            id:        t.treatment_id,
-            name:      t.service_name,
-            totalCost: Number(t.total_cost) || 0,
-          }))
-        )
-      })
-      .catch(err => {
-        if (err.response?.status === 401) {
-          router.push('/login')
-        } else {
-          setServError(err.response?.data?.message || err.message)
-        }
-      })
-      .finally(() => setServLoading(false))
-  }, [pacienteId, router])
+    useEffect(() => {
+    if (!pagosLoading) {
+      setLocalPayments(payments);
+    }
+  }, [payments, pagosLoading]);
 
   // UI state
   const [searchTerm, setSearchTerm]     = useState('')
@@ -170,7 +104,7 @@ export default function PatientPaymentsClient() {
   const handleUpdate = async data => {
     setActionLoading(true)
     try {
-      await updatePayment(data)
+      await updatePayment(data); 
       await fetchPayments()
       setOpenEditModal(false)
     } catch {
@@ -214,7 +148,7 @@ export default function PatientPaymentsClient() {
   }
 
   // Filtrado y paginación
-  const filtered = payments.filter(p => {
+  const filtered = localPayments.filter(p => {
     const matchesSearch = p.tratamiento.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           p.numero_factura.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter==='all' || p.estado===statusFilter
@@ -231,31 +165,14 @@ export default function PatientPaymentsClient() {
   })
   const paginated = filtered.slice(page*rowsPerPage, page*rowsPerPage+rowsPerPage)
 
-  // Loading & Errors
-  if (pLoading || pagosLoading || servLoading) {
-    return <Dialog open><DialogContent sx={{textAlign:'center',p:4}}><CircularProgress/></DialogContent></Dialog>
-  }
-  if (pError)    return <Alert severity="error">Error paciente: {pError}</Alert>
-  if (pagosError) return <Alert severity="error">Error pagos: {pagosError}</Alert>
-  if (servError)  return <Alert severity="error">Error servicios: {servError}</Alert>
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <SectionTitle
-        title={`Historial de Pagos: ${paciente.nombre} ${paciente.apellidos}`}
-        breadcrumbs={[
-          { label:'Pacientes', href:'/pacientes' },
-          { label:`${paciente.nombre} ${paciente.apellidos}`, href:`/pacientes/${pacienteId}` },
-          { label:'Pagos' }
-        ]}
-      />
-
+    <div>
       {/* Buscador & Nuevo */}
       <Paper className="mb-6 p-4" elevation={2}>
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex gap-2">
             <TextField
-              label="Buscar"
+              label="Buscar por tratamiento"
               size="small"
               value={searchTerm}
               onChange={e=>{setSearchTerm(e.target.value);setPage(0)}}
@@ -272,7 +189,7 @@ export default function PatientPaymentsClient() {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <FormControl size="small">
               <InputLabel>Estatus de pago</InputLabel>
               <Select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setPage(0)}} label="Estatus de pago">
@@ -295,43 +212,17 @@ export default function PatientPaymentsClient() {
         )}
 
         {/* Tabla de pagos */}
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Fecha</TableCell>
-                <TableCell>Tratamiento</TableCell>
-                <TableCell align="right">Costo</TableCell>
-                <TableCell align="right">Monto</TableCell>
-                <TableCell>Estatus</TableCell>
-                <TableCell align="right">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginated.map(p => (
-                <TableRow key={p.id} hover>
-                  <TableCell><CalendarTodayIcon fontSize="small"/> {formatDate(p.fecha)}</TableCell>
-                  <TableCell>{p.tratamiento}</TableCell>
-                  <TableCell align="right"><AttachMoneyIcon fontSize="small"/> {p.total_cost.toFixed(2)}</TableCell>
-                  <TableCell align="right"><AttachMoneyIcon fontSize="small"/> {p.monto.toFixed(2)}</TableCell>
-                  <TableCell><Chip label={p?.estado?.toUpperCase()} color={getStatusColor(p?.estado)} size="small"/></TableCell>
-                  <TableCell align="right">
-                    <IconButton onClick={()=>{setSelectedPayment(p);setDetailsOpen(true)}}><VisibilityIcon/></IconButton>
-                    <IconButton onClick={()=>generatePDF(p,paciente)}><DownloadIcon/></IconButton>
-                    <IconButton onClick={()=>handleSendEmail(p)} disabled={!paciente.email}><EmailIcon/></IconButton>
-                    <IconButton onClick={()=>{setEditPayment(p);setOpenEditModal(true)}}><EditIcon/></IconButton>
-                    <IconButton onClick={()=>{setSelectedPayment(p);setConfirmDeleteOpen(true)}}><DeleteIcon/></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {paginated.length===0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">No hay pagos</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <PaymentsTable
+          data={paginated}
+          paciente={paciente}
+          formatDate={formatDate}
+          getStatusColor={getStatusColor}
+          onView={(p) => { setSelectedPayment(p); setDetailsOpen(true) }}
+          onDownload={(p) => generatePDF(p, paciente)}
+          onEmail={(p) => handleSendEmail(p)}
+          onEdit={p => { setEditPayment(p); setOpenEditModal(true) }}
+          onDelete={(p) => { setSelectedPayment(p); setConfirmDeleteOpen(true) }}
+        />
 
         <TablePagination
           component="div"
@@ -360,7 +251,7 @@ export default function PatientPaymentsClient() {
         open={openCreateModal}
         onClose={()=>setOpenCreateModal(false)}
         initialData={null}
-        servicios={servicios}
+        servicios={initialServicios}
         onSave={handleCreate}
       />
 
@@ -368,7 +259,7 @@ export default function PatientPaymentsClient() {
         open={openEditModal}
         onClose={()=>setOpenEditModal(false)}
         initialData={editPayment}
-        servicios={servicios}
+        servicios={initialServicios}
         onSave={handleUpdate}
       />
 

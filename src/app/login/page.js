@@ -6,8 +6,6 @@ import { Email, Lock, Visibility, VisibilityOff } from '@mui/icons-material'
 import CircularProgress from '@mui/material/CircularProgress'
 import { Alert, Button } from '@mui/material'
 
-import api from '../../../lib/api'
-
 import {
   Card,
   CardHeader,
@@ -28,19 +26,30 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    try {
-      const { data } = await api.post('/auth/login', { email, password })
-      localStorage.setItem('token', data.token)
-      router.replace('/pacientes')
-    } catch (err) {
-      setError(err.response?.data?.message || err.message)
-    } finally {
-      setLoading(false)
+  e.preventDefault()
+  setLoading(true)
+  setError(null)
+  try {
+    const res = await fetch('/api/auth/login', {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body:        JSON.stringify({ email, password }),
+    })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.error || 'Login falló')
+// Guarda el token en localStorage para que tu interceptor de axios lo use:
+    if (body.token) {
+      localStorage.setItem('token', body.token)
     }
+
+    router.replace('/pacientes')
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="min-h-[90vh] flex items-center justify-center bg-gradient-to-br p-4">
