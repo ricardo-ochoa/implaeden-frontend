@@ -151,7 +151,17 @@ export default function TratamientosClient({ paciente }) {
           </Button>
           </div>
         ) : (
+          <>
           <Typography variant="h6">No hay tratamientos registrados:</Typography>
+          <Button
+            sx={{ width: { xs: '100%', md: '40%', lg: 300 }, mt:  { xs: 2, lg: 2 } }}
+            variant="outlined"
+            onClick={() => setIsModalOpen(true)}
+            startIcon={<UploadFileIcon />}
+          >
+            Agregar nuevo tratamiento
+          </Button>
+          </>
         )}
 
         <Box display="flex" flexWrap="wrap" gap={2}>
