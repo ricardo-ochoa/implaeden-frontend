@@ -17,6 +17,7 @@ export default async function PatientDetailPage({ params }) {
   if (!res.ok) throw new Error(`Error cargando pacientes (${res.status})`)
   const patients = await res.json()
 
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <SectionTitle isHome title="Pacientes" />
