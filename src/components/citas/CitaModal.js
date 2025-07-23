@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Button, Box, FormControl, InputLabel,
   Select, MenuItem,
-} from '@mui/material'
+} from '@mui/material';
 
 export default function CitaModal({
   open, onClose, servicios, onSave, initialData = null
@@ -12,41 +12,45 @@ export default function CitaModal({
     appointment_at: '',
     service_id: '',
     observaciones: '',
-  })
+  });
 
   // Helper para formatear la fecha a input datetime-local
   const toLocalDateTime = iso => {
-    const dt = new Date(iso)
-    const pad = n => String(n).padStart(2, '0')
-    const YYYY = dt.getFullYear()
-    const MM   = pad(dt.getMonth() + 1)
-    const DD   = pad(dt.getDate())
-    const hh   = pad(dt.getHours())
-    const mm   = pad(dt.getMinutes())
-    return `${YYYY}-${MM}-${DD}T${hh}:${mm}`
-  }
+    if (!iso) return ''; // Añadido para seguridad
+    const dt = new Date(iso);
+    if (isNaN(dt.getTime())) return ''; // Añadido para seguridad
+
+    const pad = n => String(n).padStart(2, '0');
+    const YYYY = dt.getFullYear();
+    const MM = pad(dt.getMonth() + 1);
+    const DD = pad(dt.getDate());
+    const hh = pad(dt.getHours());
+    const mm = pad(dt.getMinutes());
+    return `${YYYY}-${MM}-${DD}T${hh}:${mm}`;
+  };
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
     if (initialData) {
+      // --- CORRECCIÓN AQUÍ ---
       setForm({
-        appointment_at: toLocalDateTime(initialData.appointmentAt),
-        service_id:     initialData.serviceId,
+        appointment_at: toLocalDateTime(initialData.appointment_at),
+        service_id:     initialData.service_id,
         observaciones:  initialData.observaciones || '',
-      })
+      });
     } else {
-      setForm({ appointment_at: '', service_id: '', observaciones: '' })
+      setForm({ appointment_at: '', service_id: '', observaciones: '' });
     }
-  }, [open, initialData])
+  }, [open, initialData]);
 
   const handleChange = field => e =>
-    setForm(f => ({ ...f, [field]: e.target.value }))
+    setForm(f => ({ ...f, [field]: e.target.value }));
 
   const handleGuardar = async () => {
-    const ok = await onSave(form)
-    if (ok) onClose()
-  }
+    const ok = await onSave(form);
+    if (ok) onClose();
+  };
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -95,5 +99,5 @@ export default function CitaModal({
         </Button>
       </DialogActions>
     </Dialog>
-  )
+  );
 }

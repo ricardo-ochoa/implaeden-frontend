@@ -15,6 +15,8 @@ import AddIcon from '@mui/icons-material/Add'
 import { useCitas } from '../../../../../lib/hooks/useCitas'
 import CitasTable from '@/components/citas/CitasTable'
 import CitaModal from '@/components/citas/CitaModal'
+import useSWR from 'swr'
+import api, { fetcher } from '../../../../../lib/api'
 
 export default function CitasClient({
   paciente,
@@ -22,96 +24,106 @@ export default function CitasClient({
   initialCitas = [],
 }) {
   const pacienteId = paciente.id
-  // hook "verdadero" que refresca en backend
+
+  // 1. SWR reemplaza a `useCitas` y al estado local `citasLoad`
   const {
-    citas,
-    loading: loadingCitas,
+    data: citas, // `data` de SWR es ahora nuestra lista de citas
     error: errorCitas,
-    refresh,
-    createCita,
-    updateCita,
-    deleteCita,
-  } = useCitas(pacienteId)
+    isLoading: loadingCitas,
+    mutate, // La función para refrescar los datos
+  } = useSWR(
+    `/pacientes/${pacienteId}/citas`,
+    fetcher,
+    { fallbackData: initialCitas } // Usa los datos del servidor para la carga inicial
+  )
 
-  // 1️⃣ Estado local que arranca con lo traído en SSR
-  const [citasLoad, setCitasLoad] = useState(initialCitas)
-  // y lo re‑sincronizamos cuando el hook trae nuevos datos
-  useEffect(() => {
-    if (!loadingCitas) {
-      setCitasLoad(citas)
-    }
-  }, [citas, loadingCitas])
-
-  const [servicios, setServicios] = useState(initialServicios)
-  const [modalOpen, setModalOpen]       = useState(false)
-  const [mensaje, setMensaje]           = useState('')
+  // El resto de los estados de la UI se mantienen
+  const [servicios] = useState(initialServicios) // Los servicios no cambian, un useState simple es suficiente
+  const [modalOpen, setModalOpen] = useState(false)
+  const [mensaje, setMensaje] = useState('')
   const [selectedCita, setSelectedCita] = useState(null)
-  const [confirmOpen, setConfirmOpen]   = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [citaToDelete, setCitaToDelete] = useState(null)
 
-  const formatearFechaHora = iso =>
-    new Date(iso).toLocaleString('es-ES', {
+  const formatearFechaHora = (isoString) => {
+    // 1. Verifica si el valor de entrada es nulo o indefinido
+    if (!isoString) {
+      return 'Fecha no disponible';
+    }
+
+    const fecha = new Date(isoString);
+
+    // 2. Verifica si la fecha creada es válida
+    if (isNaN(fecha.getTime())) {
+      return 'Fecha inválida';
+    }
+
+    // 3. Si todo es correcto, formatea la fecha
+    return fecha.toLocaleString('es-ES', {
       year: 'numeric', month: 'long', day: 'numeric',
       hour: '2-digit', minute: '2-digit',
-    })
+    });
+  };
 
-  // Cuando monta, refresca hook y carga servicios si no vienen por props
-  useEffect(() => {
-    refresh()
-    if (!initialServicios.length) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios`)
-        .then(r => r.json())
-        .then(setServicios)
-        .catch(console.error)
-    }
-  }, [pacienteId, refresh, initialServicios])
-
-  const handleSave = async form => {
-    const { appointment_at, service_id } = form
-    if (!appointment_at || !service_id) {
-      setMensaje('Por favor complete fecha y tratamiento')
-      return false
-    }
-    try {
-      if (selectedCita) {
-        await updateCita({ ...form, id: selectedCita.id })
-        setMensaje('Cita actualizada exitosamente')
-      } else {
-        await createCita(form)
-        setMensaje('Cita creada exitosamente')
-      }
-      // el refresh dispara el hook y el efecto resetea citasLoad
-      return true
-    } catch {
-      setMensaje('Error guardando la cita')
-      return false
-    } finally {
-      setTimeout(() => setMensaje(''), 3000)
-    }
+  // 2. Simplificamos los handlers para usar `api` y `mutate`
+const handleSave = async form => {
+  const { appointment_at, service_id } = form;
+  if (!appointment_at || !service_id) {
+    setMensaje('Por favor complete fecha y tratamiento');
+    return false;
   }
 
+  try {
+    // --- CORRECCIÓN AQUÍ ---
+    const promise = selectedCita
+      // La URL de PUT debe incluir el ID del paciente para coincidir con el backend
+      ? api.put(`/pacientes/${pacienteId}/citas/${selectedCita.id}`, form)
+      // La URL de POST ya era correcta
+      : api.post(`/pacientes/${pacienteId}/citas`, form);
+    
+    await promise;
+    
+    mutate(); // Refresca los datos con SWR
+    
+    setMensaje(selectedCita ? 'Cita actualizada exitosamente' : 'Cita creada exitosamente');
+    handleCloseModal();
+    return true;
+  } catch (err) {
+    setMensaje('Error guardando la cita');
+    return false;
+  } finally {
+    setTimeout(() => setMensaje(''), 3000);
+  }
+}
+
   const handleEdit = cita => {
-    setSelectedCita(cita)
-    setModalOpen(true)
+    setSelectedCita(cita);
+    setModalOpen(true);
   }
 
   const handleRequestDelete = id => {
-    const cita = citasLoad.find(c => c.id === id)
-    setCitaToDelete(cita)
-    setConfirmOpen(true)
+    const cita = citas.find(c => c.id === id);
+    setCitaToDelete(cita);
+    setConfirmOpen(true);
   }
 
-  const handleConfirmDelete = async () => {
-    if (!citaToDelete) return
-    await deleteCita(citaToDelete.id)
-    setMensaje('Cita eliminada exitosamente')
-    setTimeout(() => setMensaje(''), 3000)
-    setConfirmOpen(false)
+const handleConfirmDelete = async () => {
+  if (!citaToDelete) return;
+  try {
+    await api.delete(`/pacientes/${pacienteId}/citas/${citaToDelete.id}`);
+    mutate(); // Refresca los datos con SWR
+    setMensaje('Cita eliminada exitosamente');
+  } catch (err) {
+    setMensaje('Error eliminando la cita');
+  } finally {
+    setTimeout(() => setMensaje(''), 3000);
+    setConfirmOpen(false);
   }
+};
 
   const handleCloseModal = () => {
-    setModalOpen(false)
-    setSelectedCita(null)
+    setModalOpen(false);
+    setSelectedCita(null);
   }
 
   return (
@@ -163,7 +175,7 @@ export default function CitasClient({
             </Box>
           ) : (
             <CitasTable
-              citas={citasLoad}
+              citas={citas || []}
               servicios={servicios}
               formatearFechaHora={formatearFechaHora}
               onEdit={handleEdit}

@@ -38,7 +38,7 @@ export default function CitasTable({
 
   // siempre ordena descendente por fecha
   const sorted = [...citas].sort((a, b) =>
-    new Date(b.appointmentAt) - new Date(a.appointmentAt)
+    new Date(b.appointment_at) - new Date(a.appointment_at)
   )
 
   // Variante móvil: tarjetas
@@ -55,7 +55,7 @@ export default function CitasTable({
                 </Typography>
                 <Typography variant="body2">
                   <strong>Fecha y Hora:</strong>{' '}
-                  {formatearFechaHora(cita.appointmentAt)}
+                  {formatearFechaHora(cita.appointment_at)}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Tratamiento:</strong> {cita?.tratamiento || '—'}
@@ -64,7 +64,7 @@ export default function CitasTable({
                   <strong>Observaciones:</strong> {cita.observaciones || '—'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  <strong>Registrado:</strong> {formatearFechaHora(cita.createdAt)}
+                  <strong>Registrado:</strong> {formatearFechaHora(cita.created_at)}
                 </Typography>
                 <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
                   <Button
@@ -75,6 +75,7 @@ export default function CitasTable({
                   >
                     Editar
                   </Button>
+                </Box>
                   <Button
                     startIcon={<DeleteIcon />}
                     size="small"
@@ -84,7 +85,6 @@ export default function CitasTable({
                   >
                     Eliminar
                   </Button>
-                </Box>
               </CardContent>
             </Card>
           )
@@ -114,10 +114,10 @@ export default function CitasTable({
             return (
               <TableRow key={cita.id} hover>
                 <TableCell>{numero}</TableCell>
-                <TableCell>{formatearFechaHora(cita.appointmentAt)}</TableCell>
+                <TableCell>{formatearFechaHora(cita.appointment_at)}</TableCell>
                 <TableCell>{cita?.tratamiento || '—'}</TableCell>
                 <TableCell style={{ maxWidth:"200px"}}>{cita.observaciones || '—'}</TableCell>
-                <TableCell>{formatearFechaHora(cita.createdAt)}</TableCell>
+                <TableCell>{formatearFechaHora(cita.created_at)}</TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Button

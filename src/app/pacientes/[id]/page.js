@@ -1,5 +1,5 @@
 // app/pacientes/[id]/page.js
-import { headers, cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect }           from 'next/navigation' 
 import SectionTitle           from '@/components/SectionTitle'
 import BasicInfoCard          from '@/components/BasicInfoCard'
@@ -17,7 +17,7 @@ export default async function PatientDetailPage({ params }) {
   // Trae el paciente usando ISR
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
     next: { 
-      revalidate: 3600 // <-- 1 hora
+      revalidate: 86400 // <-- día
     },
     headers: {
       Authorization: `Bearer ${token}`,
