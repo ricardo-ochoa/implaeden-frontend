@@ -1,29 +1,23 @@
+// src/components/Header.js
 'use client';
 
 import { AppBar, Toolbar, Button, Box } from '@mui/material';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie'; // <-- Importar
 import { useAuth } from '../../lib/hooks/useAuth';
-import api from '../../lib/api';
 
 export default function Header() {
   const router = useRouter();
-  const user = useAuth();
+  const user = useAuth(); // Este hook necesita el ajuste del paso 2
 
-  const handleLogout = async () => {
-    // 1) Borra el token del localStorage
-    localStorage.removeItem('token');
+  const handleLogout = () => {
+    // 1. Borra la cookie del navegador
+    Cookies.remove('token', { path: '/' });
 
-    // 2) Llama a nuestro endpoint interno que caduca la cookie httpOnly
-    await fetch('/api/auth/logout', { method: 'POST' });
-
-    // 3) (Opcional) Si tu backend tiene un endpoint de logout que también invalide el JWT en servidor:
-    try {
-      await api.post('/auth/logout');
-    } catch {}
-
-    // 4) Redirige al login
+    // 2. Redirige y refresca para limpiar el estado del servidor
     router.push('/login');
+    router.refresh(); 
   };
 
   return (
@@ -34,7 +28,6 @@ export default function Header() {
           alt="Implaedén Logo"
           width={150}
           height={40}
-          className="object-contain"
         />
         <Box>
           {user ? (

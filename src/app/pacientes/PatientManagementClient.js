@@ -21,14 +21,6 @@ export default function PatientManagementClient() {
   const { savePatient, loading: saving, error: saveError } = useSavePatient();
   const { patients, totalPages, loading, error, refreshPatientsList } = usePatients(page, searchTerm);
 
-  // Protege la ruta: si no hay token, redirige al login
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-    }
-  }, [router]);
-
   const handlePageChange = (event, value) => {
     setPage(value);
   };

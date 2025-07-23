@@ -121,6 +121,7 @@ export default function CitasTable({
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Button
+                    variant='outlined'
                       size="small"
                       startIcon={<EditIcon />}
                       onClick={() => onEdit(cita)}
@@ -128,6 +129,7 @@ export default function CitasTable({
                       Editar
                     </Button>
                     <Button
+                    variant='outlined'
                       size="small"
                       color="error"
                       startIcon={<DeleteIcon />}

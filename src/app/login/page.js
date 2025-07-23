@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Email, Lock, Visibility, VisibilityOff } from '@mui/icons-material'
 import CircularProgress from '@mui/material/CircularProgress'
 import { Alert, Button } from '@mui/material'
-
 import {
   Card,
   CardHeader,
@@ -25,24 +24,37 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault()
   setLoading(true)
   setError(null)
   try {
-    const res = await fetch('/api/auth/login', {
-      method:      'POST',
-      headers:     { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body:        JSON.stringify({ email, password }),
-    })
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      }
+    )
     const body = await res.json()
-    if (!res.ok) throw new Error(body.error || 'Login falló')
-// Guarda el token en localStorage para que tu interceptor de axios lo use:
-    if (body.token) {
-      localStorage.setItem('token', body.token)
-    }
 
+    if (!res.ok) throw new Error(body.error || 'Login falló')
+
+    if (body.accessToken) {
+      // --- INICIO DEL AJUSTE SIN LIBRERÍA ---
+      
+      // 1. Calcular la fecha de expiración (7 días desde ahora)
+      const date = new Date();
+      date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000));
+      const expires = "expires=" + date.toUTCString();
+
+      // 2. Asignar la cookie con el formato requerido
+      document.cookie = `token=${body.accessToken}; ${expires}; path=/`;
+
+      // --- FIN DEL AJUSTE ---s
+    }
+    
     router.replace('/pacientes')
   } catch (err) {
     setError(err.message)
