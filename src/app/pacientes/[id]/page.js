@@ -6,37 +6,28 @@ import BasicInfoCard          from '@/components/BasicInfoCard'
 import GeneralCard            from '@/components/GeneralCard'
 
 export default async function PatientDetailPage({ params }) {
-  const { id } = params
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL
-  if (!baseUrl) throw new Error('NEXT_PUBLIC_API_URL no definida')
-
-  // 1) Recoge las cookies que envió el navegador
-  const cookieHeader = headers().get('cookie') || ''
-
-  // 2) Si usas JWT en cookie 'token', extrae su valor
-  const token = cookies().get('token')?.value
-  const authHeader = token ? { Authorization: `Bearer ${token}` } : {}
-
-  // 3) Si no hay token, redirige
+  const { id } = params;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  const token = cookies().get('token')?.value;
   if (!token) {
-    redirect('/login')
+    redirect('/login');
   }
 
-  // 4) Construye las cabeceras de fetch
-  const fetchHeaders = {
-    ...authHeader,
-    cookie: cookieHeader,
-  }
-
-  // 5) Trae el paciente
+  // Trae el paciente usando ISR
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
-    cache:  'no-store',
-    headers: fetchHeaders,
-  })
-  if (!res.ok) {
-    throw new Error(`No se pudo cargar paciente (${res.status})`)
-  }
-  const patient = await res.json()
+    next: { 
+      revalidate: 3600 // <-- 1 hora
+    },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (res.status === 401) redirect('/login');
+  if (!res.ok) throw new Error(`No se pudo cargar paciente (${res.status})`);
+  
+  const patient = await res.json();
 
   // 6) Define las tarjetas
   const cards = [
@@ -72,12 +63,10 @@ export default async function PatientDetailPage({ params }) {
           { label: `${patient.nombre} ${patient.apellidos}`.trim() },
         ]}
       />
-
       <div className="grid md:grid-cols-2 gap-4">
         <div className="md:col-span-1">
           <BasicInfoCard patient={patient} />
         </div>
-
         <div className="md:grid md:grid-cols-2 gap-4">
           {cards.map((card, i) => (
             <GeneralCard

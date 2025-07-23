@@ -1,122 +1,120 @@
 // app/pacientes/[id]/historial/PatientHistoryClient.js
-'use client'
+'use client';
 
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import {
-  Avatar,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardActions,
-  CardMedia,
-  IconButton,
-  Typography,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  DialogTitle,
-} from '@mui/material'
-import VisibilityIcon from '@mui/icons-material/Visibility'
-import CloseIcon from '@mui/icons-material/Close'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-import UploadFilesModal from '@/components/UploadFilesModal'
-import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
-import useClinicalHistories from '../../../../../lib/hooks/useClinicalHistories'
-import useDeleteClinicalHistory from '../../../../../lib/hooks/useDeleteClinicalHistory'
-import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar'
-import { formatDate } from '../../../../../lib/utils/formatDate'
+  Avatar, Box, Button, Card, CardContent, CardActions, CardMedia,
+  IconButton, Typography, Dialog, DialogActions, DialogContent,
+  Snackbar, Alert, CircularProgress, DialogTitle
+} from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import CloseIcon from '@mui/icons-material/Close';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import UploadFilesModal from '@/components/UploadFilesModal';
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
+import useSWR from 'swr';
+import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
+import { formatDate } from '../../../../../lib/utils/formatDate';
+import api, { fetcher } from '../../../../../lib/api';
 
-export default function PatientHistoryClient({ patient }) {
-  const defaultAvatar = useRandomAvatar()
-  const patientId    = patient.id
-  const patientName  = `${patient.nombre} ${patient.apellidos}`.trim()
-  const avatarUrl    = patient.foto_perfil_url || defaultAvatar
+// 1. El componente ahora acepta `patient` y `clinicalRecords` como props
+export default function PatientHistoryClient({ patient, clinicalRecords: initialHistoryData }) {
+  const defaultAvatar = useRandomAvatar();
+  const patientId = patient.id;
+  const patientName = `${patient.nombre} ${patient.apellidos}`.trim();
+  const avatarUrl = patient.foto_perfil_url || defaultAvatar;
 
-  // Hooks
+  // 2. SWR maneja la obtención, caché y revalidación de datos
   const {
-  clinicalRecords,
-  loading: historiesLoading,
-  error: historiesError,
-  fetchClinicalHistories,
-  addClinicalHistory,
-} = useClinicalHistories(patientId)
+    data: clinicalRecords,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(
+    `/clinical-histories/${patientId}`,
+    fetcher,
+    { fallbackData: initialHistoryData } // Usa los datos del servidor
+  );
 
-  const {
-    deleteClinicalHistory,
-    loading: deleting,
-    error: deleteError,
-  } = useDeleteClinicalHistory(fetchClinicalHistories)
+  // 3. Se eliminaron los hooks `useClinicalHistories` y `useDeleteClinicalHistory`
 
-  // UI state
-  const [isSaving,    setIsSaving]   = useState(false)
-  const [showSuccess, setShowSuccess]= useState(false)
-  const [modalOpen,   setModalOpen]  = useState(false)
-  const [deleteOpen,  setDeleteOpen] = useState(false)
-  const [toDelete,    setToDelete]   = useState(null)
-  const [newDate,     setNewDate]    = useState('')
-  const [newFiles,    setNewFiles]   = useState([])
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false); 
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [toDelete, setToDelete] = useState(null);
+  const [newDate, setNewDate] = useState('');
+  const [newFiles, setNewFiles] = useState([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailFile, setDetailFile] = useState(null);
 
-  // Preview / Detail
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewFile, setPreviewFile] = useState(null)
-  const [detailOpen,  setDetailOpen]  = useState(false)
-  const [detailFile,  setDetailFile]  = useState(null)
+  // 4. Se asegura que `clinicalRecords` sea un array antes de usar `reduce`
+  const groupedRecords = (clinicalRecords || []).reduce((acc, rec) => {
+    const day = rec.record_date.split('T')[0];
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(rec);
+    return acc;
+  }, {});
+  const hasRecords = Object.keys(groupedRecords).length > 0;
 
-  // Agrupar por día
-  const groupedRecords = clinicalRecords.reduce((acc, rec) => {
-    const day = rec.record_date.split('T')[0]
-    if (!acc[day]) acc[day] = []
-    acc[day].push(rec)
-    return acc
-  }, {})
-  const hasRecords = Object.keys(groupedRecords).length > 0
-
-  // Handlers
-  const handleSave = async () => {
-    if (!newDate || newFiles.length === 0) {
-      alert('Fecha y archivos obligatorios')
-      return
-    }
-    setIsSaving(true)
-    try {
-      await addClinicalHistory(newDate, newFiles)
-  // 1) Re-fetch para actualizar la lista
-      await fetchClinicalHistories()
-      setShowSuccess(true)
-      setModalOpen(false)
-      setNewDate('')
-      setNewFiles([])
-    } finally {
-      setIsSaving(false)
-    }
+  // 5. Los handlers ahora usan `api` directamente y `mutate` de SWR
+const handleSave = async () => {
+  if (!newDate || newFiles.length === 0) {
+    alert('Fecha y archivos obligatorios');
+    return;
   }
+  const form = new FormData();
+  form.append('record_date', newDate);
+  
+  // --- CORRECCIÓN AQUÍ ---
+  newFiles.forEach((f) => form.append('files', f));
+
+  setIsSaving(true);
+  try {
+    await api.post(`/clinical-histories/${patientId}`, form);
+    mutate(); // Refresca los datos con SWR
+    setModalOpen(false);
+    setShowSuccess(true);
+    setNewDate('');
+    setNewFiles([]);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleDelete = async () => {
-    if (!toDelete) return
-    setIsSaving(true)
-    try {
-      await deleteClinicalHistory(toDelete.id)
-  // 2) Re-fetch para quitarlo de la lista
-      await fetchClinicalHistories()
-      setDeleteOpen(false)
-    } finally {
-      setIsSaving(false)
-    }
-  }
+    if (!toDelete) return;
+    
+    setIsDeleting(true); // 2. Usamos el nuevo estado de carga
+    setDeleteError(null); 
 
-  // Render
-  if (historiesLoading) return <CircularProgress />
-  if (historiesError)  return <Alert severity="error">{historiesError}</Alert>
+    try {
+      await api.delete(`/clinical-histories/${toDelete.id}`);
+      mutate();
+      setDeleteOpen(false);
+      setToDelete(null);
+    } catch (err) {
+      console.error(err);
+      setDeleteError(err.response?.data?.message || 'Error al eliminar el archivo.');
+    } finally {
+      setIsDeleting(false); // 2. Usamos el nuevo estado de carga
+    }
+  };
+
+  if (isLoading) return <CircularProgress />;
+  if (error) return <Alert severity="error">Error al cargar el historial clínico.</Alert>;
 
   return (
     <>
       {/* Loading mutaciones */}
-      {(isSaving || deleting) && (
+      {(isSaving || isDeleting) && (
         <Dialog open>
           <DialogContent sx={{ textAlign: 'center', p: 4 }}>
             <CircularProgress sx={{ mb: 2 }} />
@@ -124,6 +122,7 @@ export default function PatientHistoryClient({ patient }) {
           </DialogContent>
         </Dialog>
       )}
+
       <Snackbar
         open={showSuccess}
         autoHideDuration={3000}

@@ -16,7 +16,7 @@ export default async function PatientDetailPage({ params }) {
 
   const res = await fetch(`${baseUrl}/pacientes`, {
     next: { 
-      revalidate: 1800 // <-- 30 min
+      revalidate: 3600 // <-- 1h
     },
     headers: {
       Authorization: `Bearer ${token}`,
