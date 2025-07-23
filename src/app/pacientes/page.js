@@ -15,7 +15,9 @@ export default async function PatientDetailPage({ params }) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const res = await fetch(`${baseUrl}/pacientes`, {
-    cache: 'no-store',
+    next: { 
+      revalidate: 1800 // <-- 30 min
+    },
     headers: {
       Authorization: `Bearer ${token}`,
     },
