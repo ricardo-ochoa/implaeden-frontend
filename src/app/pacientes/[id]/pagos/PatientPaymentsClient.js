@@ -19,6 +19,7 @@ import {
   MenuItem,
   Snackbar,
   Alert,
+  useMediaQuery,
 } from '@mui/material'
 import {
   Search as SearchIcon,
@@ -30,7 +31,9 @@ import {
   ConfirmDeleteDialog,
 } from '@/components/paymentDialogs'
 import { formatDate } from '../../../../../lib/utils/formatDate'
-import PaymentsTable from '@/components/payments/PaymentsTable'
+// import PaymentsTable from '@/components/payments/PaymentsTable'
+import PaymentsList from '@/components/payments/PaymentsList'
+import theme from '@/theme'
 
 export default function PatientPaymentsClient(
   {paciente, initialPayments, initialServicios}
@@ -39,6 +42,7 @@ export default function PatientPaymentsClient(
   const router = useRouter()
   const generatePDF = useGeneratePaymentPDF()
   const [localPayments, setLocalPayments] = useState(initialPayments);
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
 
   const getStatusColor = st => {
@@ -183,7 +187,7 @@ export default function PatientPaymentsClient(
             </IconButton>
             <Typography>{filtered.length} resultados</Typography>
           </div>
-          <Button variant="contained" onClick={()=>setOpenCreateModal(true)}>
+          <Button fullWidth={isMobile} variant="contained" onClick={()=>setOpenCreateModal(true)}>
             Nuevo Pago
           </Button>
         </div>
@@ -212,7 +216,19 @@ export default function PatientPaymentsClient(
         )}
 
         {/* Tabla de pagos */}
-        <PaymentsTable
+        {/* <PaymentsTable
+          data={paginated}
+          paciente={paciente}
+          formatDate={formatDate}
+          getStatusColor={getStatusColor}
+          onView={(p) => { setSelectedPayment(p); setDetailsOpen(true) }}
+          onDownload={(p) => generatePDF(p, paciente)}
+          onEmail={(p) => handleSendEmail(p)}
+          onEdit={p => { setEditPayment(p); setOpenEditModal(true) }}
+          onDelete={(p) => { setSelectedPayment(p); setConfirmDeleteOpen(true) }}
+        /> */}
+
+        <PaymentsList
           data={paginated}
           paciente={paciente}
           formatDate={formatDate}
