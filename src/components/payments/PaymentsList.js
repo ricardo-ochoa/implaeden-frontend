@@ -121,7 +121,7 @@ export default function PaymentsList(props) {
         <TableBody>
           {Object.entries(groupedPayments).map(([tratamiento, pagos]) => (
             <React.Fragment key={tratamiento}>
-              <TableRow sx={{ backgroundColor: '#E8EFFF' }}>
+              <TableRow sx={{ backgroundColor: '#F5F7FB' }}>
                 <TableCell colSpan={6}>{ <Typography sx={{ fontWeight: 'bold' }} color='primary'>{tratamiento}</Typography>}</TableCell>
               </TableRow>
               {pagos.map(p => (
