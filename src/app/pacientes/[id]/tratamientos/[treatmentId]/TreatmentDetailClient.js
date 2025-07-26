@@ -17,6 +17,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Chip,
+  TextField,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
@@ -34,6 +35,8 @@ import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocum
 import useEmailDocuments    from '../../../../../../lib/hooks/useEmailDocuments'
 import { formatDate }       from '../../../../../../lib/utils/formatDate'
 import { useRandomAvatar } from '../../../../../../lib/hooks/useRandomAvatar'
+import EditIcon from '@mui/icons-material/Edit' // NUEVO
+import CheckIcon from '@mui/icons-material/Check' // NUEVO
 
 const DOCUMENT_TYPES = [
   { type: 'budget',       label: 'Presupuesto' },
@@ -43,23 +46,27 @@ const DOCUMENT_TYPES = [
 
 export default function TreatmentDetailClient({
   paciente,      // viene del ServerComponent
-  tratamiento,    // viene del ServerComponent
+  tratamiento: initialTratamiento,    // viene del ServerComponent
 }) {
-  const defaultAvatar = useRandomAvatar()
 
-  // aquí ya no usamos useParams ni context de paciente
+  const [tratamiento, setTratamiento] = useState(initialTratamiento);
+  const [isEditingCost, setIsEditingCost] = useState(false);
+  const [editableCost, setEditableCost] = useState(tratamiento?.total_cost || 0);
+  const [isSavingCost, setIsSavingCost] = useState(false);
+  const [costAlert, setCostAlert] = useState({ open: false, message: '', severity: 'success' });
 
-  console.log(paciente)
 
   // hook para traer / CRUD documentos
-  const {
+ const {
     documents,
     loading,
     error,
+    isUpdating, // Se usa en lugar de isSavingCost
     fetchDocuments,
     createDocument,
     deleteDocument,
-  } = useTreatmentDocuments(tratamiento?.treatment_id)
+    updateCost, // Se importa la nueva función
+  } = useTreatmentDocuments(paciente.id, tratamiento?.treatment_id)
 
   // hook para enviar por email
   const {
@@ -88,6 +95,20 @@ export default function TreatmentDetailClient({
     await fetchDocuments()
   }
 
+  const handleUpdateCost = async () => {
+    const success = await updateCost(editableCost);
+
+    if (success) {
+      // Si el hook confirma el éxito, actualizamos la UI
+      setTratamiento(prev => ({ ...prev, total_cost: parseFloat(editableCost) }));
+      setIsEditingCost(false);
+      setCostAlert({ open: true, message: 'Costo actualizado exitosamente.', severity: 'success' });
+    } else {
+      // Si el hook reporta un error, mostramos la alerta con el error del hook
+      setCostAlert({ open: true, message: error || 'Ocurrió un error.', severity: 'error' });
+    }
+  };
+
   const handleSaveDocument = async () => {
     if (!newDate || newFiles.length === 0) {
       alert('Fecha y archivos obligatorios')
@@ -107,36 +128,41 @@ export default function TreatmentDetailClient({
     await fetchDocuments()
   }
 
-  const renderCard = ({ type, label }) => {
+  console.log(documents)
+
+    const renderCard = ({ type, label }) => {
     const docs = documents.filter(d => d.document_type === type)
     const isEmailLoading = loadingLabels.has(label)
     return (
       <Card key={type}
-      sx={{
-        borderRadius: 1,
-        border: "2px solid transparent",
-        "&:hover": { borderColor: "#B2C6FB" },
-        width: { xs: "100%", lg: "32%" },
-      }}>
+        sx={{
+          borderRadius: 1,
+          border: "2px solid transparent",
+          "&:hover": { borderColor: "#B2C6FB" },
+          width: { xs: "100%", lg: "32%" },
+        }}>
         <CardContent>
           <Typography fontWeight="bold">{label}</Typography>
-          {tratamiento?.service_date && (
-            <Box display="flex" mt={1}>
-              <Typography variant="body2" fontWeight={600} mr={1}>
-                Fecha:
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {formatDate(tratamiento?.service_date)}
-              </Typography>
-            </Box>
-          )}
+          
+          {/* La lógica de la fecha ahora está dentro de la comprobación de `docs` */}
           {docs.length > 0 ? (
-            <Box display="flex" flexDirection="column" gap={1} mt={2}>
-              {docs.map(doc => {
-                const isPdf = doc.file_url.endsWith('.pdf')
-                const fileName = doc.file_url.split('/').pop()
-                return (
-                  <Box key={doc.id} position="relative">
+            <>
+              {/* SE MUESTRA LA FECHA DEL DOCUMENTO */}
+              <Box display="flex" mt={1}>
+                <Typography variant="body2" fontWeight={600} mr={1}>
+                  Fecha:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {formatDate(docs[0].created_at)}
+                </Typography>
+              </Box>
+              
+              <Box display="flex" flexDirection="column" gap={1} mt={2}>
+                {docs.map(doc => {
+                  const isPdf = doc.file_url.endsWith('.pdf')
+                  const fileName = doc.file_url.split('/').pop()
+                  return (
+                <Box key={doc.id} position="relative">
                     <Box
                       onClick={() =>
                         setPreviewFile({
@@ -188,9 +214,10 @@ export default function TreatmentDetailClient({
                       <DeleteForeverIcon />
                     </IconButton>
                   </Box>
-                )
-              })}
-            </Box>
+                  )
+                })}
+              </Box>
+            </>
           ) : (
             <Typography variant="body2" color="textSecondary" mt={2}>
               No hay documentos
@@ -198,7 +225,7 @@ export default function TreatmentDetailClient({
           )}
         </CardContent>
 
-        <CardActions sx={{ justifyContent: 'space-between' }}>
+                <CardActions sx={{ justifyContent: 'space-between' }}>
           <Button variant={docs.length > 0 ? 'outlined' : 'contained'}
             onClick={() => handleOpenModal(type)}
           >
@@ -221,17 +248,64 @@ export default function TreatmentDetailClient({
           </Button>
         </CardActions>
       </Card>
-    )
-  }
+    )}
 
   return (
     <Box>
       <Box display="flex" alignItems="center" mb={3}>
         <Typography fontWeight={600} mr={1}>Costo del tratamiento:</Typography>
-        <Typography variant="h6">
-          {new Intl.NumberFormat('es-MX',{ style:'currency',currency:'MXN' })
-            .format(tratamiento?.total_cost)}
-        </Typography>
+        
+       {isEditingCost ? (
+          <Box display="flex" alignItems="center" gap={1}>
+            <TextField
+              type="number"
+              size="small"
+              variant="outlined"
+              value={editableCost}
+              onChange={(e) => setEditableCost(e.target.value)}
+              disabled={isUpdating} 
+              sx={{ width: '120px' }}
+            />
+            <IconButton onClick={handleUpdateCost} color="primary" disabled={isUpdating}>
+              {isUpdating ? <CircularProgress size={20} /> : <CheckIcon />}
+            </IconButton>
+            <IconButton onClick={() => setIsEditingCost(false)} disabled={isUpdating}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        ) : (
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={1}
+            sx={{
+              cursor: 'pointer',
+              '& .edit-icon-button': {
+                visibility: 'hidden',
+                opacity: 0,
+                transition: 'opacity 0.2s',
+              },
+              '&:hover .edit-icon-button': {
+                visibility: 'visible',
+                opacity: 1,
+              },
+            }}
+          >
+            <Typography variant="h6">
+              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+                .format(tratamiento?.total_cost)}
+            </Typography>
+            
+            {/* Se añade una clase para poder seleccionarlo con CSS */}
+            <IconButton
+              className="edit-icon-button"
+              onClick={() => setIsEditingCost(true)}
+              size="small"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        )}
       </Box>
 
       {loading && <CircularProgress />}
@@ -300,6 +374,17 @@ export default function TreatmentDetailClient({
           {emailAlert.message}
         </Alert>
       </Snackbar>
+
+      <Snackbar
+      open={costAlert.open}
+      autoHideDuration={4000}
+      onClose={() => setCostAlert(prev => ({ ...prev, open: false }))}
+      anchorOrigin={{ vertical:'bottom', horizontal:'center' }}
+    >
+      <Alert onClose={() => setCostAlert(prev => ({ ...prev, open: false }))} severity={costAlert.severity} sx={{ width: '100%' }}>
+        {costAlert.message}
+      </Alert>
+    </Snackbar>
     </Box>
   )
 }
