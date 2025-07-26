@@ -162,8 +162,6 @@ const isFormValid = Boolean(
   form.notas
 );
 
-console.log(form)
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle fontWeight={"bold"}>{initialData ? 'Editar Pago' : 'Nuevo Pago'}</DialogTitle>
