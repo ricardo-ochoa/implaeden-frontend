@@ -7,12 +7,12 @@ import PhoneIcon from "@mui/icons-material/Phone"
 import EmailIcon from "@mui/icons-material/Email"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { useRandomAvatar } from "../../lib/hooks/useRandomAvatar"
 import theme from "@/theme"
+import { useRandomAvatar } from "../../lib/hooks/useRandomAvatar"
 
 export default function PatientCards({ patients = [] }) {
   const router = useRouter()
-  const randomAvatar = useRandomAvatar()
+  // const randomAvatar = useRandomAvatar()
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -22,7 +22,7 @@ export default function PatientCards({ patients = [] }) {
     () =>
       patients.map((patient) => ({
         ...patient,
-        avatarUrl: patient.foto_perfil_url || randomAvatar, // Aseguramos un avatar consistente por ID
+        avatarUrl: useRandomAvatar(patient.foto_perfil_url, patient.id),
       })),
     [patients],
   )
