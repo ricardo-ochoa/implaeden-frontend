@@ -185,7 +185,7 @@ export default function ProfilePictureUpload({ onChange, currentImage, isEdit })
             ref={webcamRef}
             screenshotFormat="image/jpeg"
             width="100%"
-            videoConstraints={{ facingMode: "user" }}
+            videoConstraints={{ facingMode: "environment" }}
             style={{ borderRadius: '8px' }}
           />
 
