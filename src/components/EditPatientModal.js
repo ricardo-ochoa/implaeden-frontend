@@ -33,7 +33,6 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
 
   const { updatePatient, loading, error } = useUpdatePatient();
 
-
   useEffect(() => {
     if (patient) {
       reset({
@@ -109,7 +108,7 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
             rules={{
                 required: 'Este campo es obligatorio.',
                 pattern: {
-                  value: /^[A-Za-z ]+$/,
+                  value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
                   message: 'Solo se permiten letras y espacios.',
                 },
               }}

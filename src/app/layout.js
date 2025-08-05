@@ -1,8 +1,9 @@
 // src/app/layout.js
+import { PatientProvider } from '@/context/PatientContext';
 import ClientThemeProvider from '@/components/ClientThemeProvider';
 import Header from '@/components/Header';
 import './globals.css';
-import { PatientProvider } from '@/context/PatientContext';
+import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata = {
   title: 'Implaedén ®',
@@ -14,13 +15,17 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <PatientProvider>
-      <html lang="es">
-        <body>
-          <Header />
-          <ClientThemeProvider>{children}</ClientThemeProvider>
-        </body>
-      </html>
-    </PatientProvider>
+    <html lang="es">
+      <body>
+        {/* 2. Envuelve todo con AuthProvider */}
+        <AuthProvider>
+          <PatientProvider>
+            {/* Ahora Header es un hijo de AuthProvider y podrá usar useAuth() */}
+            <Header /> 
+            <ClientThemeProvider>{children}</ClientThemeProvider>
+          </PatientProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }

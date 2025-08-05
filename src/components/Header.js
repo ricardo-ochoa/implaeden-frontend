@@ -1,24 +1,25 @@
 // src/components/Header.js
 'use client';
 
-import { AppBar, Toolbar, Button, Box } from '@mui/material';
+import { useAuth } from '@/context/AuthContext';
+import { AppBar, Toolbar, Button, Box, CircularProgress } from '@mui/material';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie'; // <-- Importar
-import { useAuth } from '../../lib/hooks/useAuth';
+
 
 export default function Header() {
   const router = useRouter();
-  const user = useAuth(); // Este hook necesita el ajuste del paso 2
+  const { logout, loading, isAuthenticated } = useAuth();
 
   const handleLogout = () => {
-    // 1. Borra la cookie del navegador
-    Cookies.remove('token', { path: '/' });
-
-    // 2. Redirige y refresca para limpiar el estado del servidor
-    router.push('/login');
-    router.refresh(); 
+    logout(); // Llama a la función del contexto.
+    router.push('/login'); // Redirige al usuario.
   };
+
+  // Muestra un loader mientras el contexto verifica si hay un token válido
+  if (loading) {
+    return <AppBar position="static" color="transparent" elevation={0} sx={{ mt: 2 }}><Toolbar /></AppBar>;
+  }
 
   return (
     <AppBar position="static" color="transparent" elevation={0} sx={{ mt: 2 }}>
@@ -30,10 +31,12 @@ export default function Header() {
           height={40}
         />
         <Box>
-          {user ? (
-            <Button variant="outlined" onClick={handleLogout}>
-              Cerrar sesión
-            </Button>
+          {isAuthenticated ? (
+            <>
+              <Button variant="outlined" onClick={handleLogout}>
+                Cerrar sesión
+              </Button>
+            </>
           ) : (
             <Button variant="contained" onClick={() => router.push('/login')}>
               Iniciar sesión

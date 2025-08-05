@@ -90,7 +90,7 @@ export default function PatientTable({ patients = [] }) {
                     size="small"
                     startIcon={<EditCalendarIcon />}
                     onClick={(e) => {
-                      e.stopPropagation(); // Mantenemos esto para no disparar el click de la fila
+                      e.stopPropagation();
                       handleNavigateToCitas(patient.id);
                     }}
                   >

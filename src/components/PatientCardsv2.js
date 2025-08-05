@@ -45,9 +45,8 @@ export default function PatientCards({ patients = [] }) {
       <Paper
         elevation={1}
         sx={{
-          p: 6,
           textAlign: "center",
-          background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+          background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 90%)",
         }}
       >
         <PersonIcon sx={{ fontSize: 64, color: "text.secondary", mb: 2 }} />
@@ -63,7 +62,7 @@ export default function PatientCards({ patients = [] }) {
 
   // --- Renderizado de las tarjetas de paciente ---
   return (
-    <Grid container spacing={4} sx={{ p: 2 }}>
+    <Grid container spacing={4}>
       {patientsWithAvatars.map((patient) => (
         <Grid item xs={12} sm={6} md={4} lg={2} key={patient.id}>
           <Card
@@ -71,11 +70,13 @@ export default function PatientCards({ patients = [] }) {
             sx={{
               position: "relative",
               height: "250px",
-              borderRadius: 4,
+              borderRadius: 5,
               overflow: "hidden",
               cursor: "pointer",
               transition: "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease",
+              border: "8px solid #fff",
               "&:hover": {
+                border: "none",
                 transform: isMobile ? "scale(1)" : "scale(1.3)",
                 zIndex: 3,
                 boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
@@ -87,16 +88,13 @@ export default function PatientCards({ patients = [] }) {
                   opacity: 1,
                   transform: "translateY(0)",
                 },
-                // ✅ REVELAR EL VELO DE COLOR AL HACER HOVER
                 "& .hover-overlay": {
                   opacity: 1,
                 },
               },
             }}
           >
-            {/* 1. Imagen de Fondo */}
             <Box
-              className="card-background"
               sx={{
                 position: "absolute",
                 top: 0,
@@ -120,7 +118,7 @@ export default function PatientCards({ patients = [] }) {
                 width: "100%",
                 height: "100%",
                 // Usamos un color del tema con opacidad para consistencia
-                backgroundColor: "rgba(0,40,105,0.8)",
+                backgroundColor: "rgba(0,40,105,0.9)",
                 opacity: 0, // Oculto por defecto
                 transition: "opacity 0.4s ease-in-out",
               }}
@@ -146,19 +144,23 @@ export default function PatientCards({ patients = [] }) {
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "flex-end", // Alinea el contenido en la parte inferior
+                justifyContent: "flex-end",
                 color: "white",
-                p: 2.5,
+                    '&:last-child': {
+                  paddingBottom: '16px',
+                   "&:hover": {
+                  paddingBottom: '24px',
+                },
+                },
               }}
             >
-              {/* Contenido que se muestra al hacer hover */}
               <Box
                 className="hover-content"
                 sx={{
                   opacity: 0,
                   transform: "translateY(20px)",
                   transition: "opacity 0.4s ease, transform 0.4s ease",
-                  mb: 1
+                  mb: 2,
                 }}
               >
                 <Box display="flex" alignItems="center" mb={1}
@@ -166,6 +168,7 @@ export default function PatientCards({ patients = [] }) {
                       "&:hover": {
                       transform: "scale(1.03)",
                       boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
+                      color: "#FF005A",
                     },
                   }}
                   >
@@ -184,6 +187,7 @@ export default function PatientCards({ patients = [] }) {
                       "&:hover": {
                       transform: "scale(1.03)",
                       boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
+                      color: "#FF005A",
                     },
                   }}
                     >
@@ -203,6 +207,7 @@ export default function PatientCards({ patients = [] }) {
                   </Typography>
                 </Box>
                 <Button
+                  size="small"
                   variant="contained"
                   color="secondary"
                   fullWidth
@@ -213,14 +218,11 @@ export default function PatientCards({ patients = [] }) {
                 </Button>
               </Box>
 
-              {/* Nombre siempre visible */}
               <Typography variant="h6" fontWeight="bold" 
-              // sx={{ textShadow: "1px 1px 4px rgba(0,0,0,0.8)"}}
                 sx={{
-                  marginTop: 1,
                   fontWeight: 600,
                   transition: "color 0.3s ease",
-                  lineHeight: 1.2,
+                  lineHeight:   1,
                   }}
                   >
                 {patient.nombre} {patient.apellidos}

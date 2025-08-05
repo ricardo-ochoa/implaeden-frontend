@@ -15,53 +15,49 @@ import {
 } from '@/components/login/Card'
 import { Input } from '@/components/login/Input'
 import { Label } from '@/components/login/Label'
+import { useAuth } from '@/context/AuthContext'
 
 export default function LoginPage() {
-  const router = useRouter()
+  const router = useRouter();
+  // 2. OBTENEMOS la función 'login' del contexto.
+  const { login } = useAuth();
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-const handleSubmit = async (e) => {
-  e.preventDefault()
-  setLoading(true)
-  setError(null)
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+      const body = await res.json();
+
+      if (!res.ok) throw new Error(body.error || 'Login falló');
+
+      if (body.accessToken) {
+        // 3. ¡AQUÍ ESTÁ EL CAMBIO CLAVE!
+        // En lugar de manipular la cookie, llamamos a la función del contexto.
+        login(body.accessToken);
       }
-    )
-    const body = await res.json()
-
-    if (!res.ok) throw new Error(body.error || 'Login falló')
-
-    if (body.accessToken) {
-      // --- INICIO DEL AJUSTE SIN LIBRERÍA ---
       
-      // 1. Calcular la fecha de expiración (7 días desde ahora)
-      const date = new Date();
-      date.setTime(date.getTime() + (7 * 24 * 60 * 60 * 1000));
-      const expires = "expires=" + date.toUTCString();
-
-      // 2. Asignar la cookie con el formato requerido
-      document.cookie = `token=${body.accessToken}; ${expires}; path=/`;
-
-      // --- FIN DEL AJUSTE ---s
+      router.replace('/pacientes');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    
-    router.replace('/pacientes')
-  } catch (err) {
-    setError(err.message)
-  } finally {
-    setLoading(false)
-  }
-}
+  };
 
   return (
     <div className="min-h-[90vh] flex items-center justify-center bg-gradient-to-br p-4">

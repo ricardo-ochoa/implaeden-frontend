@@ -17,8 +17,10 @@ export default async function PatientDetailPage({ params }) {
   // Trae el paciente usando ISR
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
     next: { 
-      revalidate: 86400 // <-- día
+      revalidate: 86400,
+      tags: [`paciente-${id}`]
     },
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token}`,
     },

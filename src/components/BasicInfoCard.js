@@ -8,8 +8,10 @@ import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
 import { Edit } from '@mui/icons-material';
 import ImageDetailModal from './ImageDetailModal';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { useRouter } from 'next/navigation';
 
 export default function BasicInfoCard({ patient: initialPatient, onPatientUpdate }) {
+  const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -60,25 +62,30 @@ const handleAvatarClick = () => {
   ];
 
   const handleUpdateSuccess = (updatedPatient) => {
-    setSnackbarOpen(false);
-    setTimeout(() => {
-      setPatient((prevPatient) => ({
-        ...prevPatient,
-        ...updatedPatient,
-      }));
-      if (onPatientUpdate) {
-        onPatientUpdate(updatedPatient); // Notificar al padre
-      }
-      setSnackbarMessage('Paciente actualizado exitosamente');
-      setSnackbarOpen(true);
-      setIsModalOpen(false);
-    }, 200);
+    // Primero, actualizamos el estado local para una respuesta visual inmediata (Optimistic UI)
+    setPatient((prevPatient) => ({
+      ...prevPatient,
+      ...updatedPatient,
+    }));
+    
+    setSnackbarMessage('Paciente actualizado exitosamente');
+    setSnackbarOpen(true);
+    setIsModalOpen(false);
+
+    // 3. ¡AQUÍ ESTÁ LA MAGIA!
+    // Le decimos a Next.js que refresque los datos del servidor.
+    // Esto hará que el Server Component se vuelva a renderizar con la nueva información.
+    router.refresh();
+
+    // La prop onPatientUpdate ya no es estrictamente necesaria con este enfoque, pero la mantenemos por si la usas en otro lado.
+    if (onPatientUpdate) {
+      onPatientUpdate(updatedPatient);
+    }
   };  
   
 
   const handleModalClose = () => {
     setIsModalOpen(false);
-    setPatient(initialPatient);
   };
 
   const avatarUrl = patient?.foto_perfil_url
