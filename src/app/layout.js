@@ -9,7 +9,7 @@ export const metadata = {
   title: 'Implaedén ®',
   description: 'Implantando Sonrisas®. Villahermosa Tabasco.',
   icons: {
-    icon: '/favicon.png',
+    icon: '/favicon.ico',
   },
 };
 
