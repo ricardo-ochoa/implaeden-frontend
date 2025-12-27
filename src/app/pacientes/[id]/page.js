@@ -1,74 +1,74 @@
 // app/pacientes/[id]/page.js
-import { cookies } from 'next/headers'
-import { redirect }           from 'next/navigation' 
-import SectionTitle           from '@/components/SectionTitle'
-import BasicInfoCard          from '@/components/BasicInfoCard'
-import GeneralCard            from '@/components/GeneralCard'
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import SectionTitle from "@/components/SectionTitle";
+import BasicInfoCard from "@/components/BasicInfoCard";
+import GeneralCard from "@/components/GeneralCard";
+import SmartSummaryAssistant from "@/components/SmartSummaryAssistant";
 
 export default async function PatientDetailPage({ params }) {
   const { id } = params;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  
-  const token = cookies().get('token')?.value;
+
+  const token = cookies().get("token")?.value;
   if (!token) {
-    redirect('/login');
+    redirect("/login");
   }
 
-  // Trae el paciente usando ISR
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
-    next: { 
+    next: {
       revalidate: 86400,
-      tags: [`paciente-${id}`]
+      tags: [`paciente-${id}`],
     },
-    cache: 'no-store',
+    cache: "no-store",
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
-  if (res.status === 401) redirect('/login');
+  if (res.status === 401) redirect("/login");
   if (!res.ok) throw new Error(`No se pudo cargar paciente (${res.status})`);
-  
+
   const patient = await res.json();
 
-  // 6) Define las tarjetas
   const cards = [
     {
-      title:       'Historial clínico',
-      description: 'Documento con la información médico del paciente.',
-      redirect:    `/pacientes/${id}/historial`,
+      title: "Historial clínico",
+      description: "Documento con la información médico del paciente.",
+      redirect: `/pacientes/${id}/historial`,
     },
     {
-      title:       'Tratamientos',
-      description: 'Información y documentos de cada tratamiento.',
-      redirect:    `/pacientes/${id}/tratamientos`,
+      title: "Tratamientos",
+      description: "Información y documentos de cada tratamiento.",
+      redirect: `/pacientes/${id}/tratamientos`,
     },
     {
-      title:       'Pagos y compras',
-      description: 'Historial de pagos de tratamientos.',
-      redirect:    `/pacientes/${id}/pagos`,
+      title: "Pagos y compras",
+      description: "Historial de pagos de tratamientos.",
+      redirect: `/pacientes/${id}/pagos`,
     },
     {
-      title:       'Citas',
-      description: 'Fecha e información de cada cita del paciente.',
-      redirect:    `/pacientes/${id}/citas`,
+      title: "Citas",
+      description: "Fecha e información de cada cita del paciente.",
+      redirect: `/pacientes/${id}/citas`,
     },
-  ]
+  ];
 
-  // 7) Renderiza
   return (
     <div className="container mx-auto px-4 py-8">
       <SectionTitle
         title={`${patient.nombre} ${patient.apellidos}`.trim()}
         breadcrumbs={[
-          { label: 'Pacientes', href: '/pacientes' },
+          { label: "Pacientes", href: "/pacientes" },
           { label: `${patient.nombre} ${patient.apellidos}`.trim() },
         ]}
       />
+
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="md:col-span-1">
+        <div className="md:col-span-1 space-y-4">
           <BasicInfoCard patient={patient} />
         </div>
+
         <div className="md:grid md:grid-cols-2 gap-4">
           {cards.map((card, i) => (
             <GeneralCard
@@ -80,6 +80,8 @@ export default async function PatientDetailPage({ params }) {
           ))}
         </div>
       </div>
+
+      <SmartSummaryAssistant patientId={Number(id)} />
     </div>
-  )
+  );
 }
