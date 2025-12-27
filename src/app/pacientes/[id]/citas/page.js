@@ -8,8 +8,8 @@ export default async function Page({ params }) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL
   if (!baseUrl) throw new Error('❌ NEXT_PUBLIC_API_URL no está definida')
 
-  const cookieStore = cookies(); // Primer paso: obtener el almacén
-  const token = cookieStore.get('token')?.value; // Segundo paso: obtener el valor
+const cookieStore = await cookies();
+const token = cookieStore.get("token")?.value;
 
   if (!token) {
     redirect('/login')

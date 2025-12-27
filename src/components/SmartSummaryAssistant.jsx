@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
+
+import { Button, IconButton, Stack } from "@mui/material";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import StopIcon from "@mui/icons-material/Stop";
+import CloseIcon from "@mui/icons-material/Close";
 
 // formateo de fechas helper
 function formatDate(dateString) {
@@ -92,24 +98,23 @@ function buildSummaryItems(summary) {
   }
 
   if (lastPayment) {
-    const fecha = lastPayment.fecha
-      ? formatDate(lastPayment.fecha)
-      : "Sin fecha";
+    const fecha = lastPayment.fecha ? formatDate(lastPayment.fecha) : "Sin fecha";
+
+    const montoNumber =
+      lastPayment.monto !== null && lastPayment.monto !== undefined && lastPayment.monto !== ""
+        ? Number(lastPayment.monto)
+        : null;
 
     const monto =
-      typeof lastPayment.monto === "number"
-        ? `$${lastPayment.monto.toFixed(2)}`
+      montoNumber !== null && !Number.isNaN(montoNumber)
+        ? `$${montoNumber.toFixed(2)}`
         : null;
 
     const partes = [];
     partes.push(fecha);
     if (monto) partes.push(`monto: ${monto}`);
-    if (lastPayment.payment_method) {
-      partes.push(`(${lastPayment.payment_method})`);
-    }
-    if (lastPayment.payment_status) {
-      partes.push(`estado: ${lastPayment.payment_status}`);
-    }
+    if (lastPayment.payment_method) partes.push(`(${lastPayment.payment_method})`);
+    if (lastPayment.payment_status) partes.push(`estado: ${lastPayment.payment_status}`);
 
     items.push({
       label: "Último pago",
@@ -122,8 +127,6 @@ function buildSummaryItems(summary) {
     });
   }
 
-  // NOTA: ya no incluimos número de evidencias aquí
-
   return items;
 }
 
@@ -132,6 +135,57 @@ export default function SmartSummaryAssistant({ patientId }) {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
+
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioUrl, setAudioUrl] = useState(null);
+
+  const audioRef = useRef(null);
+
+  const stopSoft = () => {
+  try {
+    if (!audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0; // listo para replay
+    setIsPlaying(false);
+  } catch {}
+};
+
+const cleanupHard = () => {
+  try {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setIsPlaying(false);
+  } catch {}
+};
+
+
+  const cleanupAudio = () => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.onplay = null;
+        audioRef.current.onpause = null;
+        audioRef.current.onended = null;
+        audioRef.current = null;
+      }
+
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
+
+      setIsPlaying(false);
+    } catch {}
+  };
 
   const handleClick = async () => {
     try {
@@ -146,11 +200,8 @@ export default function SmartSummaryAssistant({ patientId }) {
         body: JSON.stringify({ patientId: Number(patientId) }),
       });
 
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error || "Error al obtener resumen");
-      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Error al obtener resumen");
 
       setSummary(json);
     } catch (err) {
@@ -161,11 +212,87 @@ export default function SmartSummaryAssistant({ patientId }) {
     }
   };
 
-  const handleClose = () => {
-    setOpen(false);
+  const handleSpeak = async () => {
+    try {
+      setError(null);
+
+      // 1) Si ya hay audio cargado: toggle play/pause
+      if (audioRef.current) {
+        const a = audioRef.current;
+
+        // Si estaba al final (o ended), reinicia para que sí reproduzca
+        const ended = a.ended || (a.duration && a.currentTime >= a.duration - 0.05);
+        if (ended) {
+            try { a.currentTime = 0; } catch {}
+        }
+
+        if (a.paused) {
+            await a.play();
+            setIsPlaying(true);
+        } else {
+            a.pause();
+            setIsPlaying(false);
+        }
+        return;
+        }
+
+      // 2) No hay audio: pedirlo al backend
+      setTtsLoading(true);
+
+      const res = await fetch("/api/patient-summary/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: Number(patientId) }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let j = null;
+        try {
+          j = JSON.parse(text);
+        } catch {}
+        throw new Error(j?.error || text || "No se pudo generar el audio");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onplay = () => setIsPlaying(true);
+      audio.onpause = () => setIsPlaying(false);
+
+      // ✅ cuando termina: limpiar para que "Parar" se oculte y se libere memoria
+      audio.onended = () => {
+  setIsPlaying(false);
+  try { audio.currentTime = 0; } catch {}
+};
+
+
+      await audio.play();
+    } catch (e) {
+      console.error(e);
+      setError(e.message || "Error TTS");
+      cleanupAudio();
+    } finally {
+      setTtsLoading(false);
+    }
   };
 
+  const handleStopAudio = () => {
+  stopSoft();
+};
+
+  const handleClose = () => {
+  setOpen(false);
+  cleanupHard();
+};
+
   const summaryItems = summary ? buildSummaryItems(summary) : [];
+  const canTts = !!summary && !loading;
+  const showStop = isPlaying;
 
   return (
     <>
@@ -175,14 +302,14 @@ export default function SmartSummaryAssistant({ patientId }) {
         onClick={handleClick}
         disabled={loading}
         className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-blue-50 text-white shadow-lg flex items-center justify-center hover:scale-105 hover:bg-blue-100 disabled:bg-slate-700 transition-transform transition-colors"
-        aria-label="Ver resumen inteligente del paciente"
+        aria-label="Ver resumen del paciente"
       >
         {loading ? (
           <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
         ) : (
           <Image
             src="/icons/search.svg"
-            alt="Resumen inteligente"
+            alt="Resumen"
             width={34}
             height={34}
             className="opacity-90"
@@ -205,30 +332,58 @@ export default function SmartSummaryAssistant({ patientId }) {
                   <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center text-sm">
                     <Image
                       src="/favicon.png"
-                      alt="Resumen inteligente"
+                      alt="Resumen"
                       width={28}
                       height={28}
                       className="rounded-full"
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">
-                      Resumen inteligente
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Estado actual del paciente
-                    </p>
+                    <p className="text-sm font-semibold">Resumen</p>
+                    <p className="text-xs text-gray-500">Estado actual del paciente</p>
                   </div>
                 </div>
 
-                <button
-                  type="button"
+                <IconButton
                   onClick={handleClose}
-                  className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                   aria-label="Cerrar"
+                  title="Cerrar"
+                  size="small"
+                  sx={{ color: "grey.500", "&:hover": { color: "grey.700" } }}
                 >
-                  ×
-                </button>
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </div>
+
+              {/* ✅ Controles TTS con MUI */}
+              <div className="px-4 py-2 border-b border-gray-100 pointer-events-auto">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleSpeak}
+                    disabled={!canTts || ttsLoading}
+                    startIcon={
+                      ttsLoading ? null : isPlaying ? <PauseIcon /> : <PlayArrowIcon />
+                    }
+                    aria-label="Escuchar o pausar resumen"
+                  >
+                    {ttsLoading ? "Cargando..." : isPlaying ? "Pausar" : "Escuchar"}
+                  </Button>
+
+                  {showStop && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      onClick={handleStopAudio}
+                      startIcon={<StopIcon />}
+                      aria-label="Detener audio"
+                    >
+                      Parar
+                    </Button>
+                  )}
+                </Stack>
               </div>
 
               <div className="px-4 py-3 max-h-80 overflow-y-auto text-sm">
@@ -238,9 +393,7 @@ export default function SmartSummaryAssistant({ patientId }) {
                   </p>
                 )}
 
-                {error && !loading && (
-                  <p className="text-red-600">{error}</p>
-                )}
+                {error && !loading && <p className="text-red-600">{error}</p>}
 
                 {summaryItems.length > 0 && !loading && !error && (
                   <ul className="space-y-3">
@@ -256,9 +409,7 @@ export default function SmartSummaryAssistant({ patientId }) {
                               {item.label}
                             </p>
                           )}
-                          <p className="text-sm text-slate-900">
-                            {item.value}
-                          </p>
+                          <p className="text-sm text-slate-900">{item.value}</p>
                         </div>
                       </li>
                     ))}
