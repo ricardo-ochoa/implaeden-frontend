@@ -1,19 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
-import { Button, IconButton, Stack } from "@mui/material";
+import { Button, IconButton, Stack, Portal } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import StopIcon from "@mui/icons-material/Stop";
 import CloseIcon from "@mui/icons-material/Close";
+import SummarizeIcon from "@mui/icons-material/VoiceChat";
+import { isValidElement, cloneElement } from "react";
 
-// formateo de fechas helper
 function formatDate(dateString) {
   if (!dateString) return "Sin fecha";
   const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return dateString;
+  if (Number.isNaN(d.getTime())) return String(dateString);
   return d.toLocaleDateString("es-MX", {
     year: "numeric",
     month: "short",
@@ -24,7 +25,7 @@ function formatDate(dateString) {
 function formatDateTime(dateString) {
   if (!dateString) return "Sin fecha";
   const d = new Date(dateString);
-  if (Number.isNaN(d.getTime())) return dateString;
+  if (Number.isNaN(d.getTime())) return String(dateString);
   return d.toLocaleString("es-MX", {
     year: "numeric",
     month: "short",
@@ -34,11 +35,9 @@ function formatDateTime(dateString) {
   });
 }
 
-// Construimos los items de resumen a partir del JSON del backend
 function buildSummaryItems(summary) {
   if (!summary) return [];
-
-  const { patient, lastService, nextAppointment, lastPayment } = summary;
+  const { patient, lastService, lastAppointment, lastPayment } = summary;
   const items = [];
 
   if (patient) {
@@ -49,14 +48,17 @@ function buildSummaryItems(summary) {
   }
 
   if (lastService) {
-    const fecha = lastService.service_date
-      ? formatDate(lastService.service_date)
-      : "Sin fecha";
+    const fecha = lastService.service_date ? formatDate(lastService.service_date) : "Sin fecha";
+
+    const costoNumber =
+      lastService.total_cost !== null &&
+      lastService.total_cost !== undefined &&
+      lastService.total_cost !== ""
+        ? Number(lastService.total_cost)
+        : null;
 
     const costo =
-      typeof lastService.total_cost === "number"
-        ? `$${lastService.total_cost.toFixed(2)}`
-        : null;
+      costoNumber !== null && !Number.isNaN(costoNumber) ? `$${costoNumber.toFixed(2)}` : null;
 
     const partes = [];
     if (lastService.service_name) partes.push(lastService.service_name);
@@ -64,37 +66,22 @@ function buildSummaryItems(summary) {
     if (fecha) partes.push(`el ${fecha}`);
     if (costo) partes.push(`costo: ${costo}`);
 
-    items.push({
-      label: "Último servicio realizado",
-      value: partes.join(" "),
-    });
+    items.push({ label: "Último servicio realizado", value: partes.join(" ") });
   } else {
-    items.push({
-      label: "Último servicio realizado",
-      value: "No hay servicios registrados.",
-    });
+    items.push({ label: "Último servicio realizado", value: "No hay servicios registrados." });
   }
 
-  if (nextAppointment) {
-    const fecha = nextAppointment.appointment_at
-      ? formatDateTime(nextAppointment.appointment_at)
+  if (lastAppointment) {
+    const fecha = lastAppointment.appointment_at
+      ? formatDateTime(lastAppointment.appointment_at)
       : "Sin fecha";
 
-    const partes = [];
-    partes.push(fecha);
-    if (nextAppointment.service_name) {
-      partes.push(`para ${nextAppointment.service_name}`);
-    }
+    const partes = [fecha];
+    if (lastAppointment.service_name) partes.push(`para ${lastAppointment.service_name}`);
 
-    items.push({
-      label: "Próxima cita",
-      value: partes.join(" "),
-    });
+    items.push({ label: "Última cita registrada", value: partes.join(" ") });
   } else {
-    items.push({
-      label: "Próxima cita",
-      value: "No hay una cita programada.",
-    });
+    items.push({ label: "Última cita registrada", value: "No hay citas registradas." });
   }
 
   if (lastPayment) {
@@ -106,31 +93,27 @@ function buildSummaryItems(summary) {
         : null;
 
     const monto =
-      montoNumber !== null && !Number.isNaN(montoNumber)
-        ? `$${montoNumber.toFixed(2)}`
-        : null;
+      montoNumber !== null && !Number.isNaN(montoNumber) ? `$${montoNumber.toFixed(2)}` : null;
 
-    const partes = [];
-    partes.push(fecha);
+    const partes = [fecha];
     if (monto) partes.push(`monto: ${monto}`);
     if (lastPayment.payment_method) partes.push(`(${lastPayment.payment_method})`);
     if (lastPayment.payment_status) partes.push(`estado: ${lastPayment.payment_status}`);
 
-    items.push({
-      label: "Último pago",
-      value: partes.join(" "),
-    });
+    items.push({ label: "Último pago", value: partes.join(" ") });
   } else {
-    items.push({
-      label: "Último pago",
-      value: "No hay pagos registrados.",
-    });
+    items.push({ label: "Último pago", value: "No hay pagos registrados." });
   }
 
   return items;
 }
 
-export default function SmartSummaryAssistant({ patientId }) {
+export default function SmartSummaryAssistant({
+  patientId,
+  variant = "floating",
+  size = "small",
+  children,
+}) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
@@ -138,105 +121,94 @@ export default function SmartSummaryAssistant({ patientId }) {
 
   const [ttsLoading, setTtsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioUrl, setAudioUrl] = useState(null);
 
+  const [audioUrl, setAudioUrl] = useState(null);
   const audioRef = useRef(null);
+  const ttsPromiseRef = useRef(null);
+
+  // ✅ corta burbujeo hacia la Card (muy importante en Portals)
+  const stopEvent = (e) => {
+    if (!e) return;
+    e.preventDefault?.();
+    e.stopPropagation?.();
+  };
 
   const stopSoft = () => {
-  try {
-    if (!audioRef.current) return;
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0; // listo para replay
-    setIsPlaying(false);
-  } catch {}
-};
-
-const cleanupHard = () => {
-  try {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-    setIsPlaying(false);
-  } catch {}
-};
-
-
-  const cleanupAudio = () => {
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.onplay = null;
-        audioRef.current.onpause = null;
-        audioRef.current.onended = null;
-        audioRef.current = null;
-      }
-
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-        setAudioUrl(null);
-      }
-
+      const a = audioRef.current;
+      if (!a) return;
+      a.pause();
+      try { a.currentTime = 0; } catch {}
       setIsPlaying(false);
     } catch {}
   };
 
+  const cleanupHard = () => {
+    try {
+      const a = audioRef.current;
+      if (a) {
+        a.pause();
+        try { a.currentTime = 0; } catch {}
+        a.onplay = null;
+        a.onpause = null;
+        a.onended = null;
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
+      setIsPlaying(false);
+      ttsPromiseRef.current = null;
+    } catch {}
+  };
+
+  const attachAudioEvents = (audio) => {
+    audio.onplay = () => setIsPlaying(true);
+    audio.onpause = () => setIsPlaying(false);
+    audio.onended = () => {
+      setIsPlaying(false);
+      try { audio.currentTime = 0; } catch {}
+    };
+  };
+
+  const fetchSummary = async () => {
+    setOpen(true);
+    setLoading(true);
+    setError(null);
+
+    const res = await fetch("/api/patient-summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patientId: Number(patientId) }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "Error al obtener resumen");
+
+    setSummary(json);
+    setLoading(false);
+  };
+
   const handleClick = async () => {
     try {
-      setOpen(true);
-      setLoading(true);
-      setError(null);
-      setSummary(null);
-
-      const res = await fetch("/api/patient-summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId: Number(patientId) }),
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Error al obtener resumen");
-
-      setSummary(json);
+      if (summary) {
+        setOpen(true);
+        return;
+      }
+      await fetchSummary();
     } catch (err) {
       console.error("Error en SmartSummaryAssistant:", err);
-      setError(err.message || "Error desconocido");
-    } finally {
+      setError(err?.message || "Error desconocido");
       setLoading(false);
     }
   };
 
-  const handleSpeak = async () => {
-    try {
-      setError(null);
+  const ensureAudioLoaded = async () => {
+    if (audioRef.current) return audioRef.current;
+    if (ttsPromiseRef.current) return ttsPromiseRef.current;
 
-      // 1) Si ya hay audio cargado: toggle play/pause
-      if (audioRef.current) {
-        const a = audioRef.current;
-
-        // Si estaba al final (o ended), reinicia para que sí reproduzca
-        const ended = a.ended || (a.duration && a.currentTime >= a.duration - 0.05);
-        if (ended) {
-            try { a.currentTime = 0; } catch {}
-        }
-
-        if (a.paused) {
-            await a.play();
-            setIsPlaying(true);
-        } else {
-            a.pause();
-            setIsPlaying(false);
-        }
-        return;
-        }
-
-      // 2) No hay audio: pedirlo al backend
+    const promise = (async () => {
       setTtsLoading(true);
 
       const res = await fetch("/api/patient-summary/tts", {
@@ -248,9 +220,7 @@ const cleanupHard = () => {
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         let j = null;
-        try {
-          j = JSON.parse(text);
-        } catch {}
+        try { j = JSON.parse(text); } catch {}
         throw new Error(j?.error || text || "No se pudo generar el audio");
       }
 
@@ -259,172 +229,211 @@ const cleanupHard = () => {
       setAudioUrl(url);
 
       const audio = new Audio(url);
+      attachAudioEvents(audio);
       audioRef.current = audio;
 
-      audio.onplay = () => setIsPlaying(true);
-      audio.onpause = () => setIsPlaying(false);
+      return audio;
+    })();
 
-      // ✅ cuando termina: limpiar para que "Parar" se oculte y se libere memoria
-      audio.onended = () => {
-  setIsPlaying(false);
-  try { audio.currentTime = 0; } catch {}
-};
+    ttsPromiseRef.current = promise;
 
-
-      await audio.play();
-    } catch (e) {
-      console.error(e);
-      setError(e.message || "Error TTS");
-      cleanupAudio();
+    try {
+      return await promise;
     } finally {
       setTtsLoading(false);
+      ttsPromiseRef.current = null;
     }
   };
 
-  const handleStopAudio = () => {
-  stopSoft();
-};
+  const handleSpeak = async () => {
+    try {
+      setError(null);
+
+      if (audioRef.current) {
+        const a = audioRef.current;
+        const ended = a.ended || (a.duration && a.currentTime >= a.duration - 0.05);
+        if (ended) {
+          try { a.currentTime = 0; } catch {}
+        }
+        if (a.paused) await a.play();
+        else a.pause();
+        return;
+      }
+
+      const audio = await ensureAudioLoaded();
+      if (!audio) return;
+      await audio.play();
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || "Error TTS");
+      cleanupHard();
+    }
+  };
+
+  const handleStopAudio = () => stopSoft();
 
   const handleClose = () => {
-  setOpen(false);
-  cleanupHard();
-};
+    setOpen(false);
+    cleanupHard();
+  };
+
+  useEffect(() => {
+    return () => cleanupHard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const summaryItems = summary ? buildSummaryItems(summary) : [];
   const canTts = !!summary && !loading;
   const showStop = isPlaying;
 
+  const renderTrigger = () => {
+    if (variant === "floating") {
+      return (
+        <button
+          type="button"
+          onClick={(e) => { stopEvent(e); handleClick(); }}
+          disabled={loading}
+          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-blue-50 text-white shadow-lg flex items-center justify-center hover:scale-105 hover:bg-blue-100 disabled:bg-slate-700 transition-transform transition-colors"
+          aria-label="Ver resumen del paciente"
+        >
+          {loading ? (
+            <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Image src="/icons/search.svg" alt="Resumen" width={34} height={34} className="opacity-90" />
+          )}
+        </button>
+      );
+    }
+
+    if (children && isValidElement(children)) {
+      const originalOnClick = children.props?.onClick;
+
+      return cloneElement(children, {
+        onClick: async (e) => {
+          stopEvent(e);
+          if (typeof originalOnClick === "function") originalOnClick(e);
+          await handleClick();
+        },
+        disabled: Boolean(children.props?.disabled) || loading,
+      });
+    }
+
+    return (
+      <IconButton
+        size={size}
+        onClick={(e) => { stopEvent(e); handleClick(); }}
+        aria-label="Ver resumen"
+        title="Ver resumen"
+      >
+        <SummarizeIcon fontSize="small" />
+      </IconButton>
+    );
+  };
+
   return (
     <>
-      {/* Botón flotante */}
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={loading}
-        className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-blue-50 text-white shadow-lg flex items-center justify-center hover:scale-105 hover:bg-blue-100 disabled:bg-slate-700 transition-transform transition-colors"
-        aria-label="Ver resumen del paciente"
-      >
-        {loading ? (
-          <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-        ) : (
-          <Image
-            src="/icons/search.svg"
-            alt="Resumen"
-            width={34}
-            height={34}
-            className="opacity-90"
-          />
-        )}
-      </button>
+      {renderTrigger()}
 
-      {/* Panel / modal */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-end pointer-events-none">
+        <Portal>
+          {/* ✅ este wrapper detiene el burbujeo hacia la Card */}
           <div
-            className="absolute inset-0 bg-black/30 pointer-events-auto"
-            onClick={handleClose}
-          />
+            className="fixed inset-0 z-[2000] flex items-end justify-end pointer-events-none"
+            onMouseDown={stopEvent}
+            onClick={stopEvent}
+          >
+            {/* overlay */}
+            <div
+              className="absolute inset-0 bg-black/30 pointer-events-auto"
+              onMouseDown={(e) => { stopEvent(e); }}
+              onClick={(e) => { stopEvent(e); handleClose(); }}
+            />
 
-          <div className="relative m-4 w-full max-w-sm pointer-events-auto">
-            <div className="rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center text-sm">
-                    <Image
-                      src="/favicon.png"
-                      alt="Resumen"
-                      width={28}
-                      height={28}
-                      className="rounded-full"
-                    />
+            {/* panel */}
+            <div
+              className="relative m-4 w-full max-w-sm pointer-events-auto"
+              onMouseDown={stopEvent}
+              onClick={stopEvent}
+            >
+              <div className="rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center text-sm">
+                      <Image src="/favicon.png" alt="Resumen" width={28} height={28} className="rounded-full" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">Resumen</p>
+                      <p className="text-xs text-gray-500">Estado actual del paciente</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">Resumen</p>
-                    <p className="text-xs text-gray-500">Estado actual del paciente</p>
-                  </div>
+
+                  <IconButton
+                    onClick={(e) => { stopEvent(e); handleClose(); }}
+                    aria-label="Cerrar"
+                    title="Cerrar"
+                    size="small"
+                    sx={{ color: "grey.500", "&:hover": { color: "grey.700" } }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
                 </div>
 
-                <IconButton
-                  onClick={handleClose}
-                  aria-label="Cerrar"
-                  title="Cerrar"
-                  size="small"
-                  sx={{ color: "grey.500", "&:hover": { color: "grey.700" } }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </div>
-
-              {/* ✅ Controles TTS con MUI */}
-              <div className="px-4 py-2 border-b border-gray-100 pointer-events-auto">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleSpeak}
-                    disabled={!canTts || ttsLoading}
-                    startIcon={
-                      ttsLoading ? null : isPlaying ? <PauseIcon /> : <PlayArrowIcon />
-                    }
-                    aria-label="Escuchar o pausar resumen"
-                  >
-                    {ttsLoading ? "Cargando..." : isPlaying ? "Pausar" : "Escuchar"}
-                  </Button>
-
-                  {showStop && (
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <Button
                       size="small"
                       variant="outlined"
-                      color="error"
-                      onClick={handleStopAudio}
-                      startIcon={<StopIcon />}
-                      aria-label="Detener audio"
+                      onClick={async (e) => { stopEvent(e); await handleSpeak(); }}
+                      disabled={!canTts || ttsLoading}
+                      startIcon={ttsLoading ? null : isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
                     >
-                      Parar
+                      {ttsLoading ? "Cargando..." : isPlaying ? "Pausar" : "Escuchar"}
                     </Button>
-                  )}
-                </Stack>
-              </div>
 
-              <div className="px-4 py-3 max-h-80 overflow-y-auto text-sm">
-                {loading && (
-                  <p className="text-gray-500">
-                    Generando resumen… esto puede tomar unos segundos.
-                  </p>
-                )}
-
-                {error && !loading && <p className="text-red-600">{error}</p>}
-
-                {summaryItems.length > 0 && !loading && !error && (
-                  <ul className="space-y-3">
-                    {summaryItems.map((item, idx) => (
-                      <li
-                        key={idx}
-                        className="flex gap-3 items-start rounded-lg bg-slate-50 px-3 py-2"
+                    {showStop && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={(e) => { stopEvent(e); handleStopAudio(); }}
+                        startIcon={<StopIcon />}
                       >
-                        <span className="mt-1 h-2 w-2 rounded-full bg-blue-500" />
-                        <div>
-                          {item.label && (
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                              {item.label}
-                            </p>
-                          )}
-                          <p className="text-sm text-slate-900">{item.value}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                        Parar
+                      </Button>
+                    )}
+                  </Stack>
+                </div>
 
-                {!loading && !error && !summary && (
-                  <p className="text-gray-500">
-                    Haz clic en el botón flotante para generar un resumen.
-                  </p>
-                )}
+                <div className="px-4 py-3 max-h-80 overflow-y-auto text-sm">
+                  {loading && <p className="text-gray-500">Generando resumen…</p>}
+                  {error && !loading && <p className="text-red-600">{error}</p>}
+
+                  {summaryItems.length > 0 && !loading && !error && (
+                    <ul className="space-y-3">
+                      {summaryItems.map((item, idx) => (
+                        <li key={idx} className="flex gap-3 items-start rounded-lg bg-slate-50 px-3 py-2">
+                          <span className="mt-1 h-2 w-2 rounded-full bg-blue-500" />
+                          <div>
+                            {item.label && (
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                {item.label}
+                              </p>
+                            )}
+                            <p className="text-sm text-slate-900">{item.value}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {!loading && !error && !summary && (
+                    <p className="text-gray-500">Haz clic para generar un resumen.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </>
   );

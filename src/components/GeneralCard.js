@@ -16,8 +16,8 @@ export default function GeneralCard({ title, description, redirect }) {
       sx={{
         borderRadius: '10px',
         cursor: 'pointer',
-        border: '2px solid transparent', // Border default
-        transition: 'border-color 0.3s, box-shadow 0.3s', // Smooth transition
+        border: '2px solid transparent',
+        transition: 'border-color 0.3s, box-shadow 0.3s',
         marginBottom: {xs: 2, md: 0}, 
         '&:hover': {
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',

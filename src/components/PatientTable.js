@@ -18,6 +18,7 @@ import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 import { useRouter } from 'next/navigation';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
 import { useMemo } from 'react';
+import SmartSummaryAssistant from './SmartSummaryAssistant';
 
 export default function PatientTable({ patients = [] }) {
   const router = useRouter();
@@ -48,6 +49,7 @@ export default function PatientTable({ patients = [] }) {
             <TableCell sx={{ fontWeight: 600, p: '10px' }}>NOMBRE</TableCell>
             <TableCell sx={{ fontWeight: 600, p: '10px' }}>TELÉFONO</TableCell>
             <TableCell sx={{ fontWeight: 600, p: '10px' }}>EMAIL</TableCell>
+             <TableCell sx={{ fontWeight: 600, p: '10px' }}>RESUMEN</TableCell>
             <TableCell align="right" sx={{ fontWeight: 600, p: '10px' }}>
               CITAS
             </TableCell>
@@ -83,6 +85,9 @@ export default function PatientTable({ patients = [] }) {
                 </TableCell>
                 <TableCell sx={{ p: '8px', typography: 'body1', fontWeight: 550 }}>
                   {patient.email || 'N/A'}
+                </TableCell>
+                 <TableCell sx={{ p: '8px' }} onClick={(e) => e.stopPropagation()}>
+                  <SmartSummaryAssistant patientId={Number(patient.id)} variant="inline" />
                 </TableCell>
                 <TableCell align="right" sx={{ p: '8px' }}>
                   <Button
