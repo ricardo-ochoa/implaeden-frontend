@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-
-import { Button, IconButton, Stack, Portal } from "@mui/material";
+import { Button, IconButton, Stack, Portal, Tooltip } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import StopIcon from "@mui/icons-material/Stop";
@@ -288,22 +287,35 @@ export default function SmartSummaryAssistant({
 
   const renderTrigger = () => {
     if (variant === "floating") {
-      return (
+  return (
+    <Tooltip title="Resumen" placement="left" arrow>
+      {/* Tooltip no funciona directo en disabled, por eso el span */}
+      <span className="fixed bottom-6 right-6 z-40">
         <button
           type="button"
           onClick={(e) => { stopEvent(e); handleClick(); }}
           disabled={loading}
-          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-blue-50 text-white shadow-lg flex items-center justify-center hover:scale-105 hover:bg-blue-100 disabled:bg-slate-700 transition-transform transition-colors"
-          aria-label="Ver resumen del paciente"
+          className="
+            h-12 w-12 rounded-full
+            bg-blue-50 shadow-lg
+            flex items-center justify-center
+            border border-blue-200
+            hover:scale-105 hover:bg-blue-100 hover:border-blue-300
+            disabled:bg-slate-700 disabled:border-slate-600
+            transition-transform transition-colors
+          "
+          aria-label="Resumen"
         >
           {loading ? (
             <span className="h-5 w-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
           ) : (
-            <Image src="/icons/search.svg" alt="Resumen" width={34} height={34} className="opacity-90" />
+            <SummarizeIcon color="primary" />
           )}
         </button>
-      );
-    }
+      </span>
+    </Tooltip>
+  );
+}
 
     if (children && isValidElement(children)) {
       const originalOnClick = children.props?.onClick;
@@ -322,6 +334,7 @@ export default function SmartSummaryAssistant({
       <IconButton
         size={size}
         onClick={(e) => { stopEvent(e); handleClick(); }}
+        color="primary"
         aria-label="Ver resumen"
         title="Ver resumen"
       >

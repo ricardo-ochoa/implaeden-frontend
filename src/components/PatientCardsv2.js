@@ -177,10 +177,11 @@ export default function PatientCards({ patients = [] }) {
                   alignItems="center"
                   mb={1}
                   sx={{
+                    transition: "transform 0.2s ease, color 0.2s ease",
                     "&:hover": {
                       transform: "scale(1.03)",
-                      boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
-                      color: "#FF005A",
+                      color: "secondary.main",
+                      "& svg": { color: "secondary.main" },
                     },
                   }}
                 >
@@ -192,6 +193,7 @@ export default function PatientCards({ patients = [] }) {
                       e.stopPropagation();
                       handleCopyToClipboard(patient.telefono);
                     }}
+                    sx={{ cursor: "pointer" }}
                   >
                     {patient.telefono || "N/A"}
                   </Typography>
@@ -202,10 +204,11 @@ export default function PatientCards({ patients = [] }) {
                   alignItems="center"
                   mb={2}
                   sx={{
+                    transition: "transform 0.2s ease, color 0.2s ease",
                     "&:hover": {
                       transform: "scale(1.03)",
-                      boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)",
-                      color: "#FF005A",
+                      color: "secondary.main",
+                      "& svg": { color: "secondary.main" },
                     },
                   }}
                 >
@@ -217,6 +220,7 @@ export default function PatientCards({ patients = [] }) {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      cursor: "pointer",
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -227,14 +231,13 @@ export default function PatientCards({ patients = [] }) {
                   </Typography>
                 </Box>
 
-                {/* ✅ Botones */}
                 <Box display="flex" flexDirection="column" gap={1}>
                   <Button
                     size="small"
                     variant="contained"
                     color="secondary"
                     fullWidth
-                    startIcon={<CalendarMonthIcon />}
+                    startIcon={<CalendarMonthIcon/>}
                     onClick={(e) => handleNavigateToCitas(e, patient.id)}
                   >
                     Ver Citas
