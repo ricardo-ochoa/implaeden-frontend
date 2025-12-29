@@ -81,7 +81,7 @@ export default function PatientCards({ patients = [] }) {
             sx={{
               position: "relative",
               height: "250px",
-              borderRadius: 5,
+              borderRadius: 2,
               overflow: "hidden",
               cursor: "pointer",
               transition:
