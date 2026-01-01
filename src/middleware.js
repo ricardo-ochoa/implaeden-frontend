@@ -15,6 +15,11 @@ export async function middleware(req) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  if (pathname.startsWith("/register")) {
+  return NextResponse.redirect(new URL("/", req.url));
+}
+
+
   // Para rutas protegidas por matcher, si no hay token -> login
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -45,11 +50,6 @@ export async function middleware(req) {
 }
 
 export const config = {
-  matcher: [
-    "/chat/:path*",
-    "/pacientes/:path*",
-    "/citas/:path*",
-    "/tratamientos/:path*",
-    "/register/:path*",
-  ],
+  matcher: ["/chat/:path*", "/pacientes/:path*", "/citas/:path*", "/tratamientos/:path*", "/register/:path*"],
 };
+
