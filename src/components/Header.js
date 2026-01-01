@@ -1,13 +1,10 @@
 "use client";
-
 import { useAuth } from "@/context/AuthContext";
 import { useThemeMode } from "@/context/ThemeModeContext";
-import { AppBar, Toolbar, Button, Box, IconButton, Tooltip } from "@mui/material";
+import { AppBar, Toolbar, Button, Box } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import DarkModeIcon from "@mui/icons-material/DarkMode";
-import LightModeIcon from "@mui/icons-material/LightMode";
 
 export default function Header() {
   const router = useRouter();
@@ -85,30 +82,23 @@ export default function Header() {
           <Image src="/logo.svg" alt="Implaedén Logo" width={150} height={40} priority />
         </Box>
 
-        {/* Center: Nav links (menu style) */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Box component={Link} href="/chat" sx={navLinkSx("/chat")}>
-            Chat
-          </Box>
+        {/* Center: Nav links (SOLO con sesión) */}
+        {isAuthenticated ? (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box component={Link} href="/chat" sx={navLinkSx("/chat")}>
+              Chat
+            </Box>
 
-          <Box component={Link} href="/pacientes" sx={navLinkSx("/pacientes")}>
-            Pacientes
+            <Box component={Link} href="/pacientes" sx={navLinkSx("/pacientes")}>
+              Pacientes
+            </Box>
           </Box>
-        </Box>
+        ) : (
+          <Box /> // mantiene el "space-between" sin brincar layout
+        )}
 
-        {/* Right: Theme + Auth */}
+        {/* Right: Auth */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {/* <Tooltip title={mode === "dark" ? "Cambiar a Light" : "Cambiar a Dark"}>
-            <IconButton
-              onClick={toggleMode}
-              size="small"
-              aria-label="Cambiar modo de tema"
-              sx={{ border: 1, borderColor: "divider" }}
-            >
-              {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          </Tooltip> */}
-
           {isAuthenticated ? (
             <Button variant="outlined" onClick={handleLogout}>
               Cerrar sesión

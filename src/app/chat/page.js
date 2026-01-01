@@ -1,23 +1,13 @@
-"use client";
-
-import { Box } from "@mui/material";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
-import { useChatRuntime, AssistantChatTransport } from "@assistant-ui/react-ai-sdk";
-import ImplaedenThread from "@/components/chat/ImplaedenThread"; // ✅ default import
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import ChatClient from "./ChatClient";
 
 export default function ChatPage() {
- const runtime = useChatRuntime({
-  transport: new AssistantChatTransport({
-    api: "/api/ai/chat",
-  }),
-});
+  const token = cookies().get("token")?.value;
 
+  if (!token) {
+    redirect("/login");
+  }
 
-  return (
-    <Box sx={{ height: "calc(95dvh - 64px)" }}>
-      <AssistantRuntimeProvider runtime={runtime}>
-        <ImplaedenThread />
-      </AssistantRuntimeProvider>
-    </Box>
-  );
+  return <ChatClient />;
 }

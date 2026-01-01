@@ -1,5 +1,4 @@
 "use client"
-
 import { useState } from "react"
 import { CircularProgress, Alert, Snackbar, ToggleButtonGroup, ToggleButton } from "@mui/material"
 import { PatientProvider } from "@/context/PatientContext"
