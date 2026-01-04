@@ -5,8 +5,15 @@ export default function buildMuiTheme(mode = "light") {
   return createTheme({
     palette: {
       mode,
-      primary: { main: "#1976d2" },
-      secondary: { main: "#f700ff" },
+      primary: {
+        main: "hsl(var(--primary))",
+        contrastText: "hsl(var(--primary-foreground))",
+      },
+      secondary: {
+        main: "hsl(var(--secondary))",
+        contrastText: "hsl(var(--secondary-foreground))",
+      },
+
 
       // ✅ sincroniza con shadcn tokens
       background: {

@@ -34,7 +34,7 @@ export default function HomeActions({
 
       <Box className="flex items-center">
         <Button onClick={onAddPatient} className="font-semibold mr-6">
-          <Add sx={{ fontSize: 18, mr: 1 }} />
+          <Add />
           {isMobile ? "Nuevo" : "Agregar nuevo paciente"}
         </Button>
 

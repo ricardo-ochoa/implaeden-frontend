@@ -1,14 +1,31 @@
+// src/components/EditPatientModal.jsx
+'use client';
+
 import React, { useEffect } from 'react';
-import {
-  Modal,
-  Box,
-  TextField,
-  Button,
-  Typography,
-} from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
+import { format, parseISO } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
+
 import ProfilePictureUpload from './ProfilePictureUpload';
 import useUpdatePatient from '../../lib/hooks/useUpdatePatient';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 export default function EditPatientModal({ open, onClose, patient, onSuccess }) {
   const currentYear = new Date().getFullYear();
@@ -49,6 +66,12 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
     }
   }, [patient, reset]);
 
+  const minDate = `${currentYear - 100}-01-01`;
+  const maxDate = `${currentYear - 1}-12-31`;
+
+  const min = parseISO(minDate);
+  const max = parseISO(maxDate);
+
   const onSubmit = async (data) => {
     try {
       const normalizedData = {
@@ -58,38 +81,27 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
           : null,
         eliminarFoto: data.foto_perfil_url === null ? 'true' : 'false',
       };
-  
+
       await updatePatient(patient.id, normalizedData);
-      onSuccess(normalizedData); // Notifica al componente padre
-      onClose(); // Cierra el modal
+      onSuccess(normalizedData);
+      onClose();
     } catch (err) {
       console.error('Error al actualizar los datos:', err);
     }
-  };   
-
-  const minDate = `${currentYear - 100}-01-01`;
-  const maxDate = `${currentYear - 1}-12-31`;
+  };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 400,
-          bgcolor: 'background.paper',
-          boxShadow: 24,
-          p: 3,
-          borderRadius: 2,
-        }}
-      >
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, textAlign: 'center' }}>
-          Editar Paciente
-        </Typography>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle className="text-center">Editar Paciente</DialogTitle>
+          <DialogDescription className="text-center">
+            Actualiza la información del paciente.
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Foto */}
           <Controller
             name="foto_perfil_url"
             control={control}
@@ -102,175 +114,208 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
             )}
           />
 
-          <Controller
-            name="nombre"
-            control={control}
-            rules={{
+          {/* Nombre */}
+          <div className="space-y-2">
+            <Label htmlFor="nombre">Nombre</Label>
+            <Controller
+              name="nombre"
+              control={control}
+              rules={{
                 required: 'Este campo es obligatorio.',
                 pattern: {
                   value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
                   message: 'Solo se permiten letras y espacios.',
                 },
               }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Nombre"
-                error={!!errors.nombre}
-                helperText={errors.nombre?.message}
-                sx={{ mb: 2 }}
-              />
+              render={({ field }) => (
+                <Input id="nombre" {...field} placeholder="Nombre" aria-invalid={!!errors.nombre} />
+              )}
+            />
+            {errors.nombre?.message && (
+              <p className="text-sm text-destructive">{errors.nombre.message}</p>
             )}
-          />
+          </div>
 
-          <Controller
-            name="apellidos"
-            control={control}
-            rules={{
-              required: 'Los apellidos son obligatorios.',
-              pattern: {
-                value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
-                message: 'Los apellidos solo pueden contener letras y espacios.',
-              },
-            }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Apellidos"
-                error={!!errors.apellidos}
-                helperText={errors.apellidos?.message}
-                sx={{ mb: 2 }}
-              />
+          {/* Apellidos */}
+          <div className="space-y-2">
+            <Label htmlFor="apellidos">Apellidos</Label>
+            <Controller
+              name="apellidos"
+              control={control}
+              rules={{
+                required: 'Los apellidos son obligatorios.',
+                pattern: {
+                  value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
+                  message: 'Los apellidos solo pueden contener letras y espacios.',
+                },
+              }}
+              render={({ field }) => (
+                <Input id="apellidos" {...field} placeholder="Apellidos" aria-invalid={!!errors.apellidos} />
+              )}
+            />
+            {errors.apellidos?.message && (
+              <p className="text-sm text-destructive">{errors.apellidos.message}</p>
             )}
-          />
+          </div>
 
-          <Controller
-            name="telefono"
-            control={control}
-            rules={{
-              required: 'El teléfono es obligatorio.',
-              pattern: {
-                value: /^[0-9]{10}$/,
-                message: 'El teléfono debe tener exactamente 10 dígitos.',
-              },
-            }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Teléfono"
-                error={!!errors.telefono}
-                helperText={errors.telefono?.message}
-                sx={{ mb: 2 }}
-              />
+          {/* Teléfono */}
+          <div className="space-y-2">
+            <Label htmlFor="telefono">Teléfono</Label>
+            <Controller
+              name="telefono"
+              control={control}
+              rules={{
+                required: 'El teléfono es obligatorio.',
+                pattern: {
+                  value: /^[0-9]{10}$/,
+                  message: 'El teléfono debe tener exactamente 10 dígitos.',
+                },
+              }}
+              render={({ field }) => (
+                <Input
+                  id="telefono"
+                  {...field}
+                  inputMode="numeric"
+                  placeholder="10 dígitos"
+                  aria-invalid={!!errors.telefono}
+                />
+              )}
+            />
+            {errors.telefono?.message && (
+              <p className="text-sm text-destructive">{errors.telefono.message}</p>
             )}
-          />
+          </div>
 
-          <Controller
-            name="fecha_nacimiento"
-            control={control}
-            rules={{
-              required: 'La fecha de nacimiento es obligatoria.',
-              validate: (value) => {
-                const selectedDate = new Date(value);
-                const min = new Date(minDate);
-                const max = new Date(maxDate);
+          {/* ✅ Fecha Nacimiento con Calendar dropdown (Month & Year) */}
+          <div className="space-y-2">
+            <Label>Fecha de Nacimiento</Label>
+
+            <Controller
+              name="fecha_nacimiento"
+              control={control}
+              rules={{
+                required: 'La fecha de nacimiento es obligatoria.',
+                validate: (value) => {
+                  if (!value) return 'La fecha de nacimiento es obligatoria.';
+                  const selectedDate = new Date(value);
+                  return (
+                    (selectedDate >= min && selectedDate <= max) ||
+                    `La fecha debe estar entre ${minDate} y ${maxDate}.`
+                  );
+                },
+              }}
+              render={({ field }) => {
+                const selected = field.value ? parseISO(field.value) : undefined;
+
                 return (
-                  selectedDate >= min &&
-                  selectedDate <= max
-                ) || `La fecha debe estar entre ${minDate} y ${maxDate}.`;
-              },
-            }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                type="date"
-                InputLabelProps={{
-                  shrink: true,
-                }}
-                inputProps={{
-                  min: minDate,
-                  max: maxDate,
-                }}
-                label="Fecha de Nacimiento"
-                error={!!errors.fecha_nacimiento}
-                helperText={errors.fecha_nacimiento?.message}
-                sx={{ mb: 2 }}
-              />
-            )}
-          />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !field.value && 'text-muted-foreground',
+                          errors.fecha_nacimiento && 'border-destructive'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(selected, 'dd/MM/yyyy') : 'Selecciona una fecha'}
+                      </Button>
+                    </PopoverTrigger>
 
-          <Controller
-            name="email"
-            control={control}
-            rules={{
-              required: 'El correo electrónico es obligatorio.',
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Ingrese un correo electrónico válido.',
-              },
-            }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                type="email"
-                label="Correo Electrónico"
-                error={!!errors.email}
-                helperText={errors.email?.message}
-                sx={{ mb: 2 }}
-              />
-            )}
-          />
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selected}
+                        defaultMonth={selected || max}
+                        onSelect={(date) => {
+                          if (!date) return;
+                          field.onChange(format(date, 'yyyy-MM-dd'));
+                        }}
+                        captionLayout="dropdown"   // ✅ como tu ejemplo
+                        fromDate={min}             // ✅ limita dropdown years
+                        toDate={max}               // ✅ limita dropdown years
+                        disabled={(date) => date < min || date > max}
+                        initialFocus
+                        className="rounded-lg border border-border shadow-sm"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                );
+              }}
+            />
 
-          <Controller
-            name="direccion"
-            control={control}
-            rules={{
-              required: 'La dirección es obligatoria.',
-            }}
-            render={({ field }) => (
-              <TextField
-                {...field}
-                fullWidth
-                label="Dirección"
-                error={!!errors.direccion}
-                helperText={errors.direccion?.message}
-                sx={{ mb: 2 }}
-              />
+            {errors.fecha_nacimiento?.message && (
+              <p className="text-sm text-destructive">{errors.fecha_nacimiento.message}</p>
             )}
-          />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="email">Correo Electrónico</Label>
+            <Controller
+              name="email"
+              control={control}
+              rules={{
+                required: 'El correo electrónico es obligatorio.',
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: 'Ingrese un correo electrónico válido.',
+                },
+              }}
+              render={({ field }) => (
+                <Input
+                  id="email"
+                  type="email"
+                  {...field}
+                  placeholder="correo@dominio.com"
+                  aria-invalid={!!errors.email}
+                />
+              )}
+            />
+            {errors.email?.message && (
+              <p className="text-sm text-destructive">{errors.email.message}</p>
+            )}
+          </div>
+
+          {/* Dirección */}
+          <div className="space-y-2">
+            <Label htmlFor="direccion">Dirección</Label>
+            <Controller
+              name="direccion"
+              control={control}
+              rules={{ required: 'La dirección es obligatoria.' }}
+              render={({ field }) => (
+                <Input
+                  id="direccion"
+                  {...field}
+                  placeholder="Calle, número, colonia..."
+                  aria-invalid={!!errors.direccion}
+                />
+              )}
+            />
+            {errors.direccion?.message && (
+              <p className="text-sm text-destructive">{errors.direccion.message}</p>
+            )}
+          </div>
 
           {error && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {error}
-            </Typography>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3, gap: 2 }}>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={onClose}
-              disabled={loading}
-            >
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button
-            fullWidth
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={!isValid || loading}
-            >
-              Guardar
+            <Button type="submit" disabled={!isValid || loading} className="min-w-[140px]">
+              {loading ? 'Guardando...' : 'Guardar'}
             </Button>
-          </Box>
+          </DialogFooter>
         </form>
-      </Box>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }

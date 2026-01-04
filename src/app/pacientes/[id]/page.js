@@ -1,6 +1,7 @@
 // app/pacientes/[id]/page.js
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+
 import SectionTitle from "@/components/SectionTitle";
 import BasicInfoCard from "@/components/BasicInfoCard";
 import GeneralCard from "@/components/GeneralCard";
@@ -11,15 +12,9 @@ export default async function PatientDetailPage({ params }) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
   const token = cookies().get("token")?.value;
-  if (!token) {
-    redirect("/login");
-  }
+  if (!token) redirect("/login");
 
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
-    next: {
-      revalidate: 86400,
-      tags: [`paciente-${id}`],
-    },
     cache: "no-store",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -30,6 +25,7 @@ export default async function PatientDetailPage({ params }) {
   if (!res.ok) throw new Error(`No se pudo cargar paciente (${res.status})`);
 
   const patient = await res.json();
+  const fullName = `${patient?.nombre || ""} ${patient?.apellidos || ""}`.trim();
 
   const cards = [
     {
@@ -57,22 +53,24 @@ export default async function PatientDetailPage({ params }) {
   return (
     <div className="container mx-auto px-4 py-8">
       <SectionTitle
-        title={`${patient.nombre} ${patient.apellidos}`.trim()}
+        title={fullName}
         breadcrumbs={[
           { label: "Pacientes", href: "/pacientes" },
-          { label: `${patient.nombre} ${patient.apellidos}`.trim() },
+          { label: fullName },
         ]}
       />
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="md:col-span-1 space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Left: Basic info */}
+        <div className="space-y-4">
           <BasicInfoCard patient={patient} />
         </div>
 
-        <div className="md:grid md:grid-cols-2 gap-4">
-          {cards.map((card, i) => (
+        {/* Right: Action cards */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {cards.map((card) => (
             <GeneralCard
-              key={i}
+              key={card.redirect}
               title={card.title}
               description={card.description}
               redirect={card.redirect}
@@ -81,7 +79,9 @@ export default async function PatientDetailPage({ params }) {
         </div>
       </div>
 
-      <SmartSummaryAssistant patientId={Number(id)} />
+      <div className="mt-6">
+        <SmartSummaryAssistant patientId={Number(id)} />
+      </div>
     </div>
   );
 }

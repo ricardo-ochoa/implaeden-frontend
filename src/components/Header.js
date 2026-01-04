@@ -1,8 +1,10 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,14 @@ export default function Header() {
   const pathname = usePathname();
   const { logout, loading, isAuthenticated } = useAuth();
 
+  // ✅ usa theme + resolvedTheme para manejar "system"
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const handleLogout = () => {
     logout();
     router.push("/login");
@@ -37,7 +47,13 @@ export default function Header() {
   const isActive = (href) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
-  // Skeleton header mientras carga auth (mantiene alto)
+  // ✅ robusto: si theme = system, usa resolvedTheme; si no, usa theme
+  const isDark =
+    mounted &&
+    (theme === "dark" || (theme === "system" && resolvedTheme === "dark"));
+
+  const logoSrc = isDark ? "/logo_dark.svg" : "/logo.svg";
+
   if (loading) {
     return (
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/70 backdrop-blur">
@@ -57,7 +73,7 @@ export default function Header() {
           aria-label="Ir al inicio"
         >
           <Image
-            src="/logo.svg"
+            src={logoSrc}
             alt="Implaedén Logo"
             width={150}
             height={40}
@@ -76,7 +92,6 @@ export default function Header() {
             </NavLink>
           </nav>
         ) : (
-          // mantiene el "space-between" sin brincar layout
           <div />
         )}
 

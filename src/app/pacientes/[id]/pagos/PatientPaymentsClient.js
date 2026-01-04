@@ -30,6 +30,7 @@ import {
   PaymentFormDialog,
   ConfirmDeleteDialog,
 } from '@/components/paymentDialogs'
+import { useTheme } from '@mui/material/styles';
 import { formatDate } from '../../../../../lib/utils/formatDate'
 // import PaymentsTable from '@/components/payments/PaymentsTable'
 import PaymentsList from '@/components/payments/PaymentsList'
@@ -42,7 +43,8 @@ export default function PatientPaymentsClient(
   const router = useRouter()
   const generatePDF = useGeneratePaymentPDF()
   const [localPayments, setLocalPayments] = useState(initialPayments);
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
 
   const getStatusColor = st => {
