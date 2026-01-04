@@ -12,7 +12,7 @@ export default function SectionTitle({ breadcrumbs = [], title, isHome }) {
   };
 
   return (
-    <Box sx={{ marginBottom: 4 }}>
+    <Box sx={{ marginBottom: 2 }}>
       {/* Botón de regresar */}
       {
         !isHome && (

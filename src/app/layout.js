@@ -4,25 +4,21 @@ import ClientThemeProvider from "@/components/ClientThemeProvider";
 import Header from "@/components/Header";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "@/components/ui/sonner";
 import "@assistant-ui/react-ui/styles/index.css";
-
-export const metadata = {
-  title: "Implaedén ®",
-  description: "Implantando Sonrisas®. Villahermosa Tabasco.",
-  icons: {
-    icon: "/favicon.ico",
-  },
-};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body>
         <AuthProvider>
-          <PatientProvider>
-            <Header />
-            <ClientThemeProvider>{children}</ClientThemeProvider>
-          </PatientProvider>
+          <ClientThemeProvider>
+            <PatientProvider>
+              <Header />
+              {children}
+              <Toaster />
+            </PatientProvider>
+          </ClientThemeProvider>
         </AuthProvider>
       </body>
     </html>

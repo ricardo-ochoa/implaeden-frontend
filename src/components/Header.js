@@ -1,17 +1,33 @@
 "use client";
-import { useAuth } from "@/context/AuthContext";
-import { useThemeMode } from "@/context/ThemeModeContext";
-import { AppBar, Toolbar, Button, Box } from "@mui/material";
+
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
+
+function NavLink({ href, children, active }) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "text-sm font-medium transition-opacity",
+        "border-b-2 pb-1",
+        active ? "border-primary" : "border-transparent",
+        "hover:opacity-85 hover:border-border",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-
   const { logout, loading, isAuthenticated } = useAuth();
-  const { mode, toggleMode } = useThemeMode();
 
   const handleLogout = () => {
     logout();
@@ -21,95 +37,64 @@ export default function Header() {
   const isActive = (href) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
-  const navLinkSx = (href) => ({
-    textDecoration: "none",
-    color: "text.primary",
-    fontWeight: 500,
-    px: 1,
-    py: 0.5,
-    borderBottom: "2px solid",
-    borderColor: isActive(href) ? "primary.main" : "transparent",
-    transition: "border-color 150ms ease, opacity 150ms ease",
-    "&:hover": {
-      color: "text.primary",
-      opacity: 0.85,
-      borderColor: isActive(href) ? "primary.main" : "divider",
-    },
-  });
-
+  // Skeleton header mientras carga auth (mantiene alto)
   if (loading) {
     return (
-      <AppBar
-        position="static"
-        elevation={0}
-        sx={{
-          mt: 2,
-          bgcolor: "transparent",
-          color: "text.primary",
-          borderBottom: 1,
-          borderColor: "divider",
-        }}
-      >
-        <Toolbar />
-      </AppBar>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/70 backdrop-blur">
+        <div className="mx-auto flex h-16 items-center justify-between" />
+      </header>
     );
   }
 
   return (
-    <AppBar
-      position="static"
-      elevation={0}
-      sx={{
-        mt: 2,
-        bgcolor: "transparent",
-        color: "text.primary",
-        borderBottom: 1,
-        borderColor: "divider",
-      }}
-    >
-      <Toolbar sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/70 backdrop-blur">
+      <div className="mx-auto flex h-16 items-center justify-between gap-4 px-4">
         {/* Left: Logo */}
-        <Box
+        <button
+          type="button"
           onClick={() => router.push("/")}
-          sx={{
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            userSelect: "none",
-          }}
+          className="flex items-center select-none"
           aria-label="Ir al inicio"
         >
-          <Image src="/logo.svg" alt="Implaedén Logo" width={150} height={40} priority />
-        </Box>
+          <Image
+            src="/logo.svg"
+            alt="Implaedén Logo"
+            width={150}
+            height={40}
+            priority
+          />
+        </button>
 
-        {/* Center: Nav links (SOLO con sesión) */}
+        {/* Center: Nav links (solo con sesión) */}
         {isAuthenticated ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box component={Link} href="/chat" sx={navLinkSx("/chat")}>
+          <nav className="flex items-center gap-6">
+            <NavLink href="/chat" active={isActive("/chat")}>
               Chat
-            </Box>
-
-            <Box component={Link} href="/pacientes" sx={navLinkSx("/pacientes")}>
+            </NavLink>
+            <NavLink href="/pacientes" active={isActive("/pacientes")}>
               Pacientes
-            </Box>
-          </Box>
+            </NavLink>
+          </nav>
         ) : (
-          <Box /> // mantiene el "space-between" sin brincar layout
+          // mantiene el "space-between" sin brincar layout
+          <div />
         )}
 
-        {/* Right: Auth */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {/* Right: Theme + Auth */}
+        <div className="flex items-center gap-2">
+          <ThemeToggleButton />
+
           {isAuthenticated ? (
-            <Button variant="outlined" onClick={handleLogout}>
+            <Button variant="outline" onClick={handleLogout}>
               Cerrar sesión
             </Button>
           ) : (
-            <Button variant="contained" onClick={() => router.push("/login")}>
+            <Button variant="outline" onClick={() => router.push("/login")}>
               Iniciar sesión
             </Button>
           )}
-        </Box>
-      </Toolbar>
-    </AppBar>
+        </div>
+      </div>
+    </header>
   );
 }

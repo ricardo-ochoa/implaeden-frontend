@@ -1,46 +1,53 @@
-import React, { useState, useRef } from 'react';
-import { Box, Button, Avatar, IconButton, Typography, CircularProgress, Alert, Modal } from '@mui/material';
-import { CloudUpload, CameraAlt } from '@mui/icons-material';
-import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined';
-import imageCompression from 'browser-image-compression';
-import Webcam from 'react-webcam'; // NUEVO: Importar react-webcam
+"use client";
 
-// NUEVO: Función para convertir la imagen de base64 (que nos da react-webcam) a un archivo.
+import React, { useRef, useState } from "react";
+import imageCompression from "browser-image-compression";
+import Webcam from "react-webcam";
+
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+import { UploadCloud, Camera, Trash2 } from "lucide-react";
+
+// Convierte base64 (webcam) a File
 const dataURLtoFile = (dataurl, filename) => {
-  const arr = dataurl.split(',');
+  const arr = dataurl.split(",");
   const mime = arr[0].match(/:(.*?);/)[1];
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
   return new File([u8arr], filename, { type: mime });
 };
-
 
 export default function ProfilePictureUpload({ onChange, currentImage, isEdit }) {
   const [preview, setPreview] = useState(currentImage ?? null);
   const [showBtn, setShowBtn] = useState(true);
   const [isCompressing, setIsCompressing] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
+  const [alertMessage, setAlertMessage] = useState("");
 
-  // CAMBIO: Ahora solo necesitamos una ref para el componente Webcam
   const webcamRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const processFile = async (file) => {
     if (!file) {
       setPreview(null);
-      onChange(null);
+      onChange?.(null);
       return;
     }
 
     if (file.size / 1024 / 1024 > 1) {
-      setAlertMessage('Ajustando imagen...');
+      setAlertMessage("Ajustando imagen...");
       setIsCompressing(true);
     } else {
-        setAlertMessage('');
+      setAlertMessage("");
     }
 
     try {
@@ -53,16 +60,14 @@ export default function ProfilePictureUpload({ onChange, currentImage, isEdit })
       const compressedFile = await imageCompression(file, options);
 
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-      };
+      reader.onloadend = () => setPreview(reader.result);
       reader.readAsDataURL(compressedFile);
-      onChange(compressedFile);
 
-      setAlertMessage('');
-    } catch (error) {
-      console.error('Error al procesar la imagen:', error);
-      setAlertMessage('Ocurrió un error al procesar la imagen.');
+      onChange?.(compressedFile);
+      setAlertMessage("");
+    } catch (err) {
+      console.error("Error al procesar la imagen:", err);
+      setAlertMessage("Ocurrió un error al procesar la imagen.");
     } finally {
       setIsCompressing(false);
     }
@@ -76,129 +81,123 @@ export default function ProfilePictureUpload({ onChange, currentImage, isEdit })
 
   const handleDeleteImage = () => {
     setPreview(null);
-    onChange(null);
+    onChange?.(null);
     setShowBtn(false);
   };
 
-  const handleOpenCamera = () => {
-    setCameraOpen(true);
-  };
-  
-  const handleCloseCamera = () => {
+  const handleCapture = () => {
+    const imageSrc = webcamRef.current?.getScreenshot?.();
+    if (imageSrc) {
+      const capturedFile = dataURLtoFile(imageSrc, "captured_photo.jpg");
+      processFile(capturedFile);
+    }
     setCameraOpen(false);
   };
 
-  const handleCapture = () => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef?.current?.getScreenshot();
-      if(imageSrc){
-        const capturedFile = dataURLtoFile(imageSrc, 'captured_photo.jpg');
-        processFile(capturedFile);
-      }
-    }
-    handleCloseCamera();
-  };
-
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        mb: 2,
-        position: 'relative',
-      }}
-    >
-      {/* (Esta parte del código no cambia) */}
+    <div className="relative mb-4 flex flex-col items-center">
+      {/* Avatar */}
+      <div className="relative">
+        <Avatar className="h-24 w-24 ring-2 ring-[#F5F7FB] ring-offset-4 ring-offset-[#B2C6FB]">
+          <AvatarImage src={preview || undefined} alt="Imagen de perfil" />
+          <AvatarFallback>PF</AvatarFallback>
+        </Avatar>
+
+        {/* Delete button (solo si edit) */}
+        {showBtn && currentImage && isEdit ? (
+          <button
+            type="button"
+            onClick={handleDeleteImage}
+            className="absolute -right-2 -top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-background shadow hover:bg-muted"
+            aria-label="Eliminar imagen"
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </button>
+        ) : null}
+      </div>
+
+      {/* Status */}
       {isCompressing ? (
-        <CircularProgress size={24} sx={{ mt: 1 }} />
-      ) : (
-        <>
-          <Avatar
-            src={preview || undefined}
-            alt="Vista previa de la imagen de perfil"
-            sx={{
-              width: 100,
-              height: 100,
-              boxShadow: '0 0 0 2px #F5F7FB, 0 0 0 5px #B2C6FB',
-              mb: 1,
-            }}
-          />
-          {showBtn && currentImage && isEdit && (
-            <IconButton
-              size="small"
-              color="warning"
-              onClick={handleDeleteImage}
-              sx={{
-                position: 'absolute',
-                top: 60, right: 120, backgroundColor: '#ffffff', zIndex: 1,
-                '&:hover': { backgroundColor: '#f2f2f2', color: 'red' },
-              }}
-            >
-              <DeleteForeverOutlinedIcon />
-            </IconButton>
-          )}
-        </>
-      )}
+        <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+          Ajustando imagen...
+        </div>
+      ) : null}
 
-      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-        {alertMessage ? (
-          <Alert severity={isCompressing ? 'info' : 'error'} sx={{ mt: 2 }}>
-            {alertMessage}
+      {/* Alert */}
+      {alertMessage && !isCompressing ? (
+        <div className="mt-3 w-full max-w-sm">
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{alertMessage}</AlertDescription>
           </Alert>
-        ) : (
-          <>
-            <Button
-              variant="contained" color="info" size="small"
-              component="label" startIcon={<CloudUpload />}
-              title="Subir una nueva imagen"
-            >
-              {isEdit ? 'Cambiar' : 'Subir'}
-              <input type="file" hidden onChange={handleFileChange} accept="image/*" />
-            </Button>
-            <Button
-              variant="outlined" color="info" size="small"
-              onClick={handleOpenCamera} startIcon={<CameraAlt />}
-            >
-              Tomar foto
-            </Button>
-          </>
-        )}
-      </Box>
+        </div>
+      ) : null}
 
-      {/* CAMBIO: El Modal ahora contiene el componente Webcam */}
-      <Modal open={cameraOpen} onClose={handleCloseCamera}>
-        <Box
-          sx={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)', width: '90%', maxWidth: '500px',
-            bgcolor: 'background.paper', boxShadow: 24, p: 2, borderRadius: 2,
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Tomar Foto
-          </Typography>
-          
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            width="100%"
-            videoConstraints={{ facingMode: "environment" }}
-            style={{ borderRadius: '8px' }}
-          />
+      {/* Buttons */}
+      {!alertMessage || isCompressing ? (
+        <div className="mt-3 flex gap-2">
+          <Button type="button" variant="default" size="sm" asChild>
+            <label className="cursor-pointer">
+              <UploadCloud />
+              {isEdit ? "Cambiar" : "Subir"}
+              <input
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </label>
+          </Button>
 
-          <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-            <Button variant="outlined" color="secondary" onClick={handleCloseCamera}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera />
+            Tomar foto
+          </Button>
+        </div>
+      ) : null}
+
+      {/* Dialog cámara */}
+      <Dialog open={cameraOpen} onOpenChange={setCameraOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Tomar Foto</DialogTitle>
+          </DialogHeader>
+
+          <div className="overflow-hidden rounded-lg border">
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              className="h-auto w-full"
+              videoConstraints={{ facingMode: "environment" }}
+            />
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setCameraOpen(false)}
+            >
               Cancelar
             </Button>
-            <Button variant="contained" color="primary" onClick={handleCapture}>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleCapture}
+            >
               Capturar
             </Button>
-          </Box>
-        </Box>
-      </Modal>
-    </Box>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

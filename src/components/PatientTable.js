@@ -1,24 +1,23 @@
-'use client';
+"use client";
+
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import SmartSummaryAssistant from "./SmartSummaryAssistant";
+import { useRandomAvatar } from "../../lib/hooks/useRandomAvatar";
 
 import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  Paper,
-  Avatar,
-  Typography,
-  IconButton,
-  Box,
-  Button,
-} from '@mui/material';
-import EditCalendarIcon from '@mui/icons-material/EditCalendar';
-import { useRouter } from 'next/navigation';
-import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
-import { useMemo } from 'react';
-import SmartSummaryAssistant from './SmartSummaryAssistant';
+} from "@/components/ui/table";
+
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import { CalendarDays } from "lucide-react";
 
 export default function PatientTable({ patients = [] }) {
   const router = useRouter();
@@ -42,81 +41,112 @@ export default function PatientTable({ patients = [] }) {
   };
 
   return (
-    <TableContainer component={Paper} elevation={1} sx={{ overflowX: 'auto', mb: 2 }}>
-      <Table sx={{ minWidth: 650 }}>
-        <TableHead sx={{ backgroundColor: "#F1F1F5", px: 1 }}>
-          <TableRow>
-            <TableCell sx={{ fontWeight: 600, p: '10px' }}>NOMBRE</TableCell>
-            <TableCell sx={{ fontWeight: 600, p: '10px' }}>TELÉFONO</TableCell>
-            <TableCell sx={{ fontWeight: 600, p: '10px' }}>EMAIL</TableCell>
-             <TableCell sx={{ fontWeight: 600, p: '10px' }}>RESUMEN</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600, p: '10px' }}>
+    <div className="mb-2 overflow-x-auto rounded-xl border bg-card">
+      <Table className="min-w-[650px]">
+        <TableHeader>
+          <TableRow className="bg-muted/60 hover:bg-muted/60">
+            <TableHead className="px-3 py-3 text-xs font-semibold tracking-wide">
+              NOMBRE
+            </TableHead>
+            <TableHead className="px-3 py-3 text-xs font-semibold tracking-wide">
+              TELÉFONO
+            </TableHead>
+            <TableHead className="px-3 py-3 text-xs font-semibold tracking-wide">
+              EMAIL
+            </TableHead>
+            <TableHead className="px-3 py-3 text-xs font-semibold tracking-wide">
+              RESUMEN
+            </TableHead>
+            <TableHead className="px-3 py-3 text-right text-xs font-semibold tracking-wide">
               CITAS
-            </TableCell>
+            </TableHead>
           </TableRow>
-        </TableHead>
+        </TableHeader>
+
         <TableBody>
-          {/* --- CONDICIÓN PARA LISTA VACÍA --- */}
           {patientsWithAvatars.length > 0 ? (
-            patientsWithAvatars.map((patient) => (
-              <TableRow
-                key={patient.id}
-                hover
-                sx={{ cursor: 'pointer' }}
-                onClick={() => handleNavigateToDetails(patient.id)}
-              >
-                <TableCell sx={{ p: '9px' }}>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Avatar
-                      src={patient.avatarUrl}
-                      alt={`${patient.nombre} ${patient.apellidos}`}
+            patientsWithAvatars.map((patient) => {
+              const fullName = `${patient.nombre} ${patient.apellidos}`.trim();
+              const initials =
+                (patient.nombre?.[0] || "") + (patient.apellidos?.[0] || "");
+
+              return (
+                <TableRow
+                  key={patient.id}
+                  onClick={() => handleNavigateToDetails(patient.id)}
+                  className="cursor-pointer hover:bg-muted/40"
+                >
+                  <TableCell className="px-3 py-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNavigateToDetails(patient.id);
+                        }}
+                        className="rounded-full"
+                        aria-label={`Abrir perfil de ${fullName}`}
+                      >
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage
+                            src={patient.avatarUrl}
+                            alt={fullName}
+                          />
+                          <AvatarFallback>
+                            {initials || "P"}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+
+                      <div className="font-semibold">{fullName}</div>
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="px-3 py-2 font-medium">
+                    {patient.telefono || "N/A"}
+                  </TableCell>
+
+                  <TableCell className="px-3 py-2 font-medium">
+                    {patient.email || "N/A"}
+                  </TableCell>
+
+                  <TableCell
+                    className="px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SmartSummaryAssistant
+                      patientId={Number(patient.id)}
+                      variant="inline"
+                    />
+                  </TableCell>
+
+                  <TableCell className="px-3 py-2 text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleNavigateToDetails(patient.id);
+                        handleNavigateToCitas(patient.id);
                       }}
-                    />
-                    <Typography sx={{ fontWeight: 550 }}>
-                      {`${patient.nombre} ${patient.apellidos}`}
-                    </Typography>
-                  </Box>
-                </TableCell>
-                <TableCell sx={{ typography: 'body1', fontWeight: 550, p: '8px' }}>
-                  {patient.telefono || 'N/A'}
-                </TableCell>
-                <TableCell sx={{ p: '8px', typography: 'body1', fontWeight: 550 }}>
-                  {patient.email || 'N/A'}
-                </TableCell>
-                 <TableCell sx={{ p: '8px' }} onClick={(e) => e.stopPropagation()}>
-                  <SmartSummaryAssistant patientId={Number(patient.id)} variant="inline" />
-                </TableCell>
-                <TableCell align="right" sx={{ p: '8px' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<EditCalendarIcon />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNavigateToCitas(patient.id);
-                    }}
-                  >
-                    Ver citas
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      Ver citas
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })
           ) : (
             <TableRow>
-              <TableCell colSpan={4} align="center">
-                <Box sx={{ py: 4 }}>
-                  <Typography variant="subtitle1" color="text.secondary">
-                    No se encontró ningún paciente.
-                  </Typography>
-                </Box>
+              <TableCell colSpan={5} className="px-3 py-10 text-center">
+                <div className="text-sm text-muted-foreground">
+                  No se encontró ningún paciente.
+                </div>
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-    </TableContainer>
+    </div>
   );
 }

@@ -1,39 +1,58 @@
 'use client';
 
-import React from 'react';
-import { Box, Button, TextField, useMediaQuery } from '@mui/material';
-import { Add } from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+import React from "react";
+import { Box, useMediaQuery } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { Add } from "@mui/icons-material";
 
-export default function HomeActions({ searchTerm, setSearchTerm, onAddPatient }) {
-  const theme = useTheme(); // Asegúrate de que ThemeProvider está envolviendo la app
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // Detectar pantallas móviles
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { List, LayoutGrid } from "lucide-react";
+
+export default function HomeActions({
+  searchTerm,
+  setSearchTerm,
+  onAddPatient,
+  viewMode,
+  setViewMode,
+}) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
     <Box
-      className="flex gap-4 mb-6 justify-between"
-      sx={{
-        flexDirection: 'row',
-      }}
+      className="flex gap-4 mb-6 justify-between w-full items-center"
+      sx={{ flexDirection: "row" }}
     >
-      <TextField
-        fullWidth
+      <Input
         placeholder="Buscar por nombre, teléfono o email"
-        variant="outlined"
-        size="small"
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        className="bg-white max-w-[500px]"
+        className="max-w-[500px] rounded-md"
       />
-      <Button
-        variant="contained"
-        startIcon={<Add />}
-        className="whitespace-nowrap max-w-[240px]"
-        style={{fontWeight: 550}}
-        onClick={onAddPatient}
-      >
-        {isMobile ? 'Nuevo' : 'Agregar nuevo paciente'}
-      </Button>
+
+      <Box className="flex items-center">
+        <Button onClick={onAddPatient} className="font-semibold mr-6">
+          <Add sx={{ fontSize: 18, mr: 1 }} />
+          {isMobile ? "Nuevo" : "Agregar nuevo paciente"}
+        </Button>
+
+        <ToggleGroup
+          type="single"
+          value={viewMode}
+          onValueChange={(val) => val && setViewMode(val)}
+          className="border rounded-lg p-0.5 bg-background"
+        >
+          <ToggleGroupItem value="table" aria-label="table view">
+            <List className="h-4 w-4" />
+          </ToggleGroupItem>
+
+          <ToggleGroupItem value="cards" aria-label="cards view">
+            <LayoutGrid className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </Box>
     </Box>
   );
 }
