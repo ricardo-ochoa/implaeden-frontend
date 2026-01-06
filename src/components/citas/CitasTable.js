@@ -1,149 +1,188 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
+
+// shadcn/ui
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
-  TableContainer,
   Table,
-  TableHead,
-  TableRow,
-  TableCell,
   TableBody,
-  Paper,
-  Typography,
-  Box,
-  Card,
-  CardContent,
-  Button,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
-export default function CitasTable({
-  citas,
-  formatearFechaHora,
-  onEdit,
-  onDelete,
-}) {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+// mini helper
+const cx = (...classes) => classes.filter(Boolean).join(' ')
 
-  if (citas.length === 0) {
+// Hook simple para responsive (reemplazo de useMediaQuery)
+function useIsMobile(maxWidth = 640) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mq = window.matchMedia(`(max-width: ${maxWidth - 1}px)`)
+    const onChange = () => setIsMobile(mq.matches)
+    onChange()
+
+    if (mq.addEventListener) {
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    } else {
+      mq.addListener(onChange)
+      return () => mq.removeListener(onChange)
+    }
+  }, [maxWidth])
+
+  return isMobile
+}
+
+export default function CitasTable({ citas = [], formatearFechaHora, onEdit, onDelete }) {
+  const isMobile = useIsMobile(640) // "sm"
+
+  const sorted = useMemo(() => {
+    return [...(citas || [])].sort(
+      (a, b) => new Date(b.appointment_at) - new Date(a.appointment_at)
+    )
+  }, [citas])
+
+  if (!sorted.length) {
     return (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="body1" color="text.secondary">
-          No hay citas registradas aún
-        </Typography>
-      </Box>
+      <div className="text-center py-10">
+        <p className="text-sm text-muted-foreground">No hay citas registradas aún</p>
+      </div>
     )
   }
-
-  // siempre ordena descendente por fecha
-  const sorted = [...citas].sort((a, b) =>
-    new Date(b.appointment_at) - new Date(a.appointment_at)
-  )
 
   // Variante móvil: tarjetas
   if (isMobile) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div className="flex flex-col gap-3">
         {sorted.map((cita, idx) => {
           const numero = sorted.length - idx
+
           return (
-            <Card key={cita.id} variant="outlined">
-              <CardContent sx={{ '& > *:not(:last-child)': { mb: 1 } }}>
-                <Typography variant="subtitle2">
-                  <strong>N.º:</strong> {numero}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Fecha y Hora:</strong>{' '}
-                  {formatearFechaHora(cita.appointment_at)}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Tratamiento:</strong> {cita?.tratamiento || '—'}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Observaciones:</strong> {cita.observaciones || '—'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  <strong>Registrado:</strong> {formatearFechaHora(cita.created_at)}
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+            <Card key={cita.id} className="border">
+              <CardContent className="p-4 space-y-2">
+                <div className="text-sm">
+                  <span className="font-semibold">N.º:</span> {numero}
+                </div>
+
+                <div className="text-sm">
+                  <span className="font-semibold">Fecha y Hora:</span>{' '}
+                  {formatearFechaHora?.(cita.appointment_at)}
+                </div>
+
+                <div className="text-sm">
+                  <span className="font-semibold">Tratamiento:</span>{' '}
+                  {cita?.tratamiento || '—'}
+                </div>
+
+                <div className="text-sm">
+                  <span className="font-semibold">Observaciones:</span>{' '}
+                  {cita?.observaciones || '—'}
+                </div>
+
+                {/* <div className="text-xs text-muted-foreground">
+                  <span className="font-semibold">Registrado:</span>{' '}
+                  {formatearFechaHora?.(cita.created_at)}
+                </div> */}
+
+                <div className="pt-2 flex flex-wrap gap-2">
                   <Button
-                    startIcon={<EditIcon />}
-                    size="small"
-                    variant="outlined"
-                    onClick={() => onEdit(cita)}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit?.(cita)}
                   >
+                    <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
-                </Box>
+
                   <Button
-                    startIcon={<DeleteIcon />}
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    onClick={() => onDelete(cita.id)}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive text-destructive hover:bg-destructive/10"
+                    onClick={() => onDelete?.(cita.id)}
                   >
+                    <Trash2 className="h-4 w-4 mr-2" />
                     Eliminar
                   </Button>
+                </div>
               </CardContent>
             </Card>
           )
         })}
-      </Box>
+      </div>
     )
   }
 
   // Variante escritorio: tabla
   return (
-    <TableContainer component={Paper} variant="outlined">
+    <div className="rounded-md border overflow-hidden">
       <Table>
-        <TableHead>
+        <TableHeader>
           <TableRow>
-            {['N.º','Fecha y Hora','Tratamiento','Observaciones','Registrado','Acciones']
-              .map(h => (
-                <TableCell key={h} sx={{ fontWeight: 'bold' }}>
-                  {h}
-                </TableCell>
-              ))
-            }
+            {['N.º', 'Fecha y Hora', 'Tratamiento', 'Observaciones', 'Acciones'].map((h) => (
+              <TableHead key={h} className="font-bold">
+                {h}
+              </TableHead>
+            ))}
           </TableRow>
-        </TableHead>
+        </TableHeader>
+
         <TableBody>
           {sorted.map((cita, idx) => {
             const numero = sorted.length - idx
+
             return (
-              <TableRow key={cita.id} hover>
-                <TableCell>{numero}</TableCell>
-                <TableCell>{formatearFechaHora(cita.appointment_at)}</TableCell>
+              <TableRow key={cita.id}>
+                <TableCell className="font-medium">{numero}</TableCell>
+
+                <TableCell>{formatearFechaHora?.(cita.appointment_at)}</TableCell>
+
                 <TableCell>{cita?.tratamiento || '—'}</TableCell>
-                <TableCell style={{ maxWidth:"200px"}}>{cita.observaciones || '—'}</TableCell>
-                <TableCell>{formatearFechaHora(cita.created_at)}</TableCell>
+
+                <TableCell className="max-w-[220px] truncate">
+                  {cita?.observaciones || '—'}
+                </TableCell>
+
+                <TableCell>{formatearFechaHora?.(cita.created_at)}</TableCell>
+
                 <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <div className="flex gap-2">
                     <Button
-                    variant='outlined'
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => onEdit(cita)}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit?.(cita)}
                     >
+                      <Pencil className="h-4 w-4 mr-2" />
                       Editar
                     </Button>
+
                     <Button
-                    variant='outlined'
-                      size="small"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => onDelete(cita.id)}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-destructive text-destructive hover:bg-destructive/10"
+                      onClick={() => onDelete?.(cita.id)}
                     >
+                      <Trash2 className="h-4 w-4 mr-2" />
                       Eliminar
                     </Button>
-                  </Box>
+                  </div>
                 </TableCell>
               </TableRow>
             )
           })}
         </TableBody>
       </Table>
-    </TableContainer>
+    </div>
   )
 }

@@ -1,294 +1,324 @@
-// app/pacientes/[id]/historial/PatientHistoryClient.js
-'use client';
+'use client'
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react'
+import useSWR from 'swr'
+import api, { fetcher } from '../../../../../lib/api'
+import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar'
+import { formatDate } from '../../../../../lib/utils/formatDate'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import {
-  Avatar, Box, Button, Card, CardContent, CardActions, CardMedia,
-  IconButton, Typography, Dialog, DialogActions, DialogContent,
-  Snackbar, Alert, CircularProgress, DialogTitle
-} from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import CloseIcon from '@mui/icons-material/Close';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import UploadFilesModal from '@/components/UploadFilesModal';
-import ConfirmDeleteModal from '@/components/ConfirmDeleteModal';
-import useSWR from 'swr';
-import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar';
-import { formatDate } from '../../../../../lib/utils/formatDate';
-import api, { fetcher } from '../../../../../lib/api';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { toast } from 'sonner'
 
-// 1. El componente ahora acepta `patient` y `clinicalRecords` como props
-export default function PatientHistoryClient({ patient, clinicalRecords: initialHistoryData }) {
-  const defaultAvatar = useRandomAvatar();
-  const patientId = patient.id;
-  const patientName = `${patient.nombre} ${patient.apellidos}`.trim();
-  const avatarUrl = patient.foto_perfil_url || defaultAvatar;
+// icons
+import { Eye, Trash2, Upload, X, Loader2 } from 'lucide-react'
 
-  // 2. SWR maneja la obtención, caché y revalidación de datos
+// Tus modales existentes (si aún son MUI, funcionan, pero ideal migrarlos luego)
+import UploadFilesModal from '@/components/UploadFilesModal'
+import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
+
+const cx = (...classes) => classes.filter(Boolean).join(' ')
+
+export default function PatientHistoryClient({
+  patient,
+  clinicalRecords: initialHistoryData,
+}) {
+  const defaultAvatar = useRandomAvatar()
+  const patientId = patient.id
+  const patientName = `${patient.nombre} ${patient.apellidos}`.trim()
+  const avatarUrl = patient.foto_perfil_url || defaultAvatar
+
   const {
     data: clinicalRecords,
     error,
     isLoading,
     mutate,
-  } = useSWR(
-    `/clinical-histories/${patientId}`,
-    fetcher,
-    { fallbackData: initialHistoryData } // Usa los datos del servidor
-  );
+  } = useSWR(`/clinical-histories/${patientId}`, fetcher, {
+    fallbackData: initialHistoryData,
+  })
 
-  // 3. Se eliminaron los hooks `useClinicalHistories` y `useDeleteClinicalHistory`
+  const [isSaving, setIsSaving] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
 
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false); 
-  const [deleteError, setDeleteError] = useState(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [toDelete, setToDelete] = useState(null);
-  const [newDate, setNewDate] = useState('');
-  const [newFiles, setNewFiles] = useState([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailFile, setDetailFile] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [toDelete, setToDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
 
-  // 4. Se asegura que `clinicalRecords` sea un array antes de usar `reduce`
-  const groupedRecords = (clinicalRecords || []).reduce((acc, rec) => {
-    const day = rec.record_date.split('T')[0];
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(rec);
-    return acc;
-  }, {});
-  const hasRecords = Object.keys(groupedRecords).length > 0;
+  const [newDate, setNewDate] = useState('')
+  const [newFiles, setNewFiles] = useState([])
 
-  // 5. Los handlers ahora usan `api` directamente y `mutate` de SWR
-const handleSave = async () => {
-  if (!newDate || newFiles.length === 0) {
-    alert('Fecha y archivos obligatorios');
-    return;
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewFile, setPreviewFile] = useState(null)
+
+  const groupedRecords = useMemo(() => {
+    return (clinicalRecords || []).reduce((acc, rec) => {
+      const day = (rec.record_date || '').split('T')[0]
+      if (!day) return acc
+      if (!acc[day]) acc[day] = []
+      acc[day].push(rec)
+      return acc
+    }, {})
+  }, [clinicalRecords])
+
+  const hasRecords = Object.keys(groupedRecords).length > 0
+
+  const openPreview = (rec) => {
+    const isPdf = (rec.file_url || '').toLowerCase().endsWith('.pdf')
+    const fileName = (rec.file_url || '').split('/').pop() || 'archivo'
+
+    setPreviewFile({
+      preview: rec.file_url,
+      type: isPdf ? 'application/pdf' : 'image/*',
+      name: fileName,
+    })
+    setPreviewOpen(true)
   }
-  const form = new FormData();
-  form.append('record_date', newDate);
-  
-  // --- CORRECCIÓN AQUÍ ---
-  newFiles.forEach((f) => form.append('files', f));
 
-  setIsSaving(true);
-  try {
-    await api.post(`/clinical-histories/${patientId}`, form);
-    mutate(); // Refresca los datos con SWR
-    setModalOpen(false);
-    setShowSuccess(true);
-    setNewDate('');
-    setNewFiles([]);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setIsSaving(false);
+  const handleSave = async () => {
+    if (!newDate || newFiles.length === 0) {
+      toast.error('Fecha y archivos obligatorios')
+      return
+    }
+
+    const form = new FormData()
+    form.append('record_date', newDate)
+    newFiles.forEach((f) => form.append('files', f))
+
+    setIsSaving(true)
+    try {
+      await api.post(`/clinical-histories/${patientId}`, form)
+      await mutate()
+      setModalOpen(false)
+      setNewDate('')
+      setNewFiles([])
+      toast.success('Expediente guardado')
+    } catch (err) {
+      console.error(err)
+      toast.error('Error guardando expediente')
+    } finally {
+      setIsSaving(false)
+    }
   }
-};
 
   const handleDelete = async () => {
-    if (!toDelete) return;
-    
-    setIsDeleting(true); // 2. Usamos el nuevo estado de carga
-    setDeleteError(null); 
+    if (!toDelete) return
+
+    setIsDeleting(true)
+    setDeleteError(null)
 
     try {
-      await api.delete(`/clinical-histories/${toDelete.id}`);
-      mutate();
-      setDeleteOpen(false);
-      setToDelete(null);
+      await api.delete(`/clinical-histories/${toDelete.id}`)
+      await mutate()
+      setDeleteOpen(false)
+      setToDelete(null)
+      toast.success('Archivo eliminado')
     } catch (err) {
-      console.error(err);
-      setDeleteError(err.response?.data?.message || 'Error al eliminar el archivo.');
+      console.error(err)
+      const msg =
+        err?.response?.data?.message || 'Error al eliminar el archivo.'
+      setDeleteError(msg)
+      toast.error(msg)
     } finally {
-      setIsDeleting(false); // 2. Usamos el nuevo estado de carga
+      setIsDeleting(false)
     }
-  };
+  }
 
-  if (isLoading) return <CircularProgress />;
-  if (error) return <Alert severity="error">Error al cargar el historial clínico.</Alert>;
+  if (isLoading) {
+    return (
+      <div className="py-10 flex justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          Error al cargar el historial clínico.
+        </AlertDescription>
+      </Alert>
+    )
+  }
 
   return (
     <>
-      {/* Loading mutaciones */}
-      {(isSaving || isDeleting) && (
+      {/* Overlay loading (guardando/eliminando) */}
+      {(isSaving || isDeleting) ? (
         <Dialog open>
-          <DialogContent sx={{ textAlign: 'center', p: 4 }}>
-            <CircularProgress sx={{ mb: 2 }} />
-            <Typography>{isSaving ? 'Guardando...' : 'Eliminando...'}</Typography>
+          <DialogContent className="sm:max-w-[420px]">
+            <div className="py-8 flex flex-col items-center gap-3">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <p className="text-sm text-muted-foreground">
+                {isSaving ? 'Guardando…' : 'Eliminando…'}
+              </p>
+            </div>
           </DialogContent>
         </Dialog>
-      )}
+      ) : null}
 
-      <Snackbar
-        open={showSuccess}
-        autoHideDuration={3000}
-        onClose={() => setShowSuccess(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert severity="success">Expediente guardado</Alert>
-      </Snackbar>
-      {deleteError && <Alert severity="error">{deleteError}</Alert>}
+      {deleteError ? (
+        <div className="mt-3">
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{deleteError}</AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
 
-      {/* Si no hay registros, mostramos botón para crear uno */}
-        {/* <Box mt={4} textAlign="center">
-          <Typography variant="h6" gutterBottom>
-            No hay historial clínico para {patientName}
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<UploadFileIcon />}
-            onClick={() => setModalOpen(true)}
-          >
-            Agregar historial clínico
-          </Button>
-        </Box> */}
+      {/* CTA */}
+      <div className="flex justify-end">
+        <Button onClick={() => setModalOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Agregar historial clínico
+        </Button>
+      </div>
 
-          <Button
-            variant="contained"
-            startIcon={<UploadFileIcon />}
-            onClick={() => setModalOpen(true)}
-          >
-            Agregar historial clínico
-          </Button>
-      {/* Grid de tarjetas sólo si hay registros */}
-      {hasRecords && (
-        <Box display="flex" flexWrap="wrap" gap={2} mt={4}>
+      {/* Grid de tarjetas */}
+      {hasRecords ? (
+        <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {Object.entries(groupedRecords).map(([date, recs]) => (
-            <Card key={date} sx={{ width: { xs: '100%', md: '45%', lg: '30%' }, m: 1 }}>
-              <CardContent>
-                <Box display="flex" alignItems="center" mb={1}>
-                  <Avatar src={avatarUrl} />
-                  <Typography ml={1}>{patientName}</Typography>
-                </Box>
-                <Typography fontWeight="bold">Historial clínico: {formatDate(date)}</Typography>
-                <Box mt={1}>
-                  {recs.map(rec => {
-                    const isPdf    = rec.file_url.endsWith('.pdf')
-                    const fileName = rec.file_url.split('/').pop()
+            <Card key={date} className="border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={avatarUrl} alt={patientName} />
+                    <AvatarFallback>
+                      {(patientName?.[0] || 'P').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium leading-none">
+                      {patientName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Historial clínico: <span className="font-semibold">{formatDate(date)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 w-100%">
+                  {recs.map((rec) => {
+                    const isPdf = (rec.file_url || '').toLowerCase().endsWith('.pdf')
+                    const fileName = (rec.file_url || '').split('/').pop() || 'archivo'
+
                     return (
-                      <Box key={rec.id} mb={1} position="relative">
-                        <Box
-                          onClick={() => {
-                            setPreviewFile({
-                              preview: rec.file_url,
-                              type: isPdf ? 'application/pdf' : 'image/jpeg',
-                              name: fileName,
-                            })
-                            setPreviewOpen(true)
-                          }}
-                          sx={{ cursor: 'pointer' }}
+                      <div key={rec.id} className="relative w-100%">
+                        <button
+                          type="button"
+                          onClick={() => openPreview(rec)}
+                          className="w-full overflow-hidden rounded-md border hover:opacity-95 transition"
+                          title={fileName}
                         >
                           {isPdf ? (
-                            <object
-                              data={rec.file_url}
-                              type="application/pdf"
-                              width="100%"
-                              height={100}
-                              style={{ pointerEvents: 'none' }}
-                            />
+                            <div className="h-[110px] w-full flex items-center justify-center text-xs text-muted-foreground bg-muted">
+                              PDF
+                            </div>
                           ) : (
-                            <CardMedia
-                              component="img"
+                            // thumbnail imagen
+                            <img
                               src={rec.file_url}
-                              sx={{ height: 100, objectFit: 'cover' }}
+                              alt={fileName}
+                              className="h-[110px] w-full object-cover"
+                              loading="lazy"
                             />
                           )}
-                        </Box>
+                        </button>
 
-                        <Box
-                          position="absolute"
-                          top={4}
-                          right={4}
-                          display="flex"
-                          gap={1}
-                          sx={{ backgroundColor: "#f2f2f2", px: 1, borderRadius: 1 }}
-                        >
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => { setToDelete(rec); setDeleteOpen(true) }}
+                        {/* acciones */}
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <Button
+                            type="button"
+                            size="icon"
+                            onClick={() => openPreview(rec)}
+                            title="Ver"
                           >
-                            <DeleteForeverIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
+                            <Eye />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="icon"
                             onClick={() => {
-                              setPreviewFile({
-                                preview: rec.file_url,
-                                type: isPdf ? 'application/pdf' : 'image/jpeg',
-                                name: fileName,
-                              })
-                              setPreviewOpen(true)
+                              setToDelete(rec)
+                              setDeleteOpen(true)
                             }}
+                            title="Eliminar"
                           >
-                            <VisibilityIcon color="primary" fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </Box>
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </div>
                     )
                   })}
-                </Box>
+                </div>
               </CardContent>
-              <CardActions>
-                <Button startIcon={<UploadFileIcon />} onClick={() => setModalOpen(true)}>
+
+              <CardFooter className="p-4 pt-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setModalOpen(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
                   {recs.length ? 'Actualizar' : 'Subir'}
                 </Button>
-              </CardActions>
+              </CardFooter>
             </Card>
           ))}
-        </Box>
+        </div>
+      ) : (
+        <div className="mt-6">
+          <Alert>
+            <AlertTitle>Sin historial</AlertTitle>
+            <AlertDescription>
+              No hay historial clínico para <span className="font-semibold">{patientName}</span>.
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
-      {/* Modales de detalle, preview, subida y eliminación */}
-      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)}>
-        <DialogTitle>Detalles del archivo</DialogTitle>
-        <DialogContent dividers>
-          <Typography>Nombre: {detailFile?.file_url.split('/').pop()}</Typography>
-          <Typography>Fecha del registro: {detailFile?.record_date.split('T')[0]}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailOpen(false)}>Cerrar</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="px-4 py-3 border-b">
+            <div className="flex items-center justify-between gap-3">
+              <DialogTitle className="text-sm font-semibold truncate">
+                {previewFile?.name}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
 
-      <Dialog
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        fullWidth
-        maxWidth="xl"
-      >
-        <DialogActions>
-          <Typography sx={{ flex: 1, pl: 2 }} fontWeight="bold">
-            {previewFile?.name}
-          </Typography>
-          <IconButton onClick={() => setPreviewOpen(false)}>
-            <CloseIcon />
-          </IconButton>
-        </DialogActions>
-        <DialogContent sx={{ height: '90vh', p: 0 }}>
-          {previewFile?.type === 'application/pdf' ? (
-            <iframe
-              src={previewFile?.preview}
-              title={previewFile.name}
-              width="100%"
-              height="100%"
-              style={{ border: 'none' }}
-            />
-          ) : (
-            <Box
-              component="img"
-              src={previewFile?.preview}
-              alt={previewFile?.name}
-              sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
-          )}
+          <div className="h-[calc(90vh-56px)] w-full">
+            {previewFile?.type === 'application/pdf' ? (
+              <iframe
+                src={previewFile?.preview}
+                title={previewFile?.name}
+                className="h-full w-full"
+              />
+            ) : (
+              <img
+                src={previewFile?.preview}
+                alt={previewFile?.name}
+                className="h-full w-full object-contain bg-black/5"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
+      {/* Upload modal (tu componente existente) */}
       <UploadFilesModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -297,6 +327,8 @@ const handleSave = async () => {
         setNewRecordFiles={setNewFiles}
         handleSaveRecord={handleSave}
       />
+
+      {/* Confirm delete (tu componente existente) */}
       <ConfirmDeleteModal
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}

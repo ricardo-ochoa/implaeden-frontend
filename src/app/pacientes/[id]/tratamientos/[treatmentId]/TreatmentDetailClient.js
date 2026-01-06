@@ -1,92 +1,111 @@
 // src/app/pacientes/[id]/tratamientos/[treatmentId]/TreatmentDetailClient.js
 'use client'
 
-import React, { useState } from 'react'
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  CardActions,
-  Button,
-  CircularProgress,
-  Alert,
-  IconButton,
-  Snackbar,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Chip,
-  TextField,
-} from '@mui/material'
-import CloseIcon from '@mui/icons-material/Close'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-import EmailIcon from '@mui/icons-material/Email'
-import DescriptionIcon from '@mui/icons-material/Description'
-import { ExpandMore } from '@mui/icons-material'
+import React, { useMemo, useState } from 'react'
 
-import SectionTitle from '@/components/SectionTitle'
+// shadcn/ui
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+
+// icons (lucide)
+import {
+  Check,
+  FileText,
+  Loader2,
+  Mail,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react'
+
 import UploadFilesModal from '@/components/UploadFilesModal'
 import FilePreviewModal from '@/components/FilePreviewModal'
 import TreatmentDetailEvidences from '@/components/TreatmentDetailEvidences'
 
 import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocuments'
-import useEmailDocuments    from '../../../../../../lib/hooks/useEmailDocuments'
-import { formatDate }       from '../../../../../../lib/utils/formatDate'
-import { useRandomAvatar } from '../../../../../../lib/hooks/useRandomAvatar'
-import EditIcon from '@mui/icons-material/Edit' // NUEVO
-import CheckIcon from '@mui/icons-material/Check' // NUEVO
+import useEmailDocuments from '../../../../../../lib/hooks/useEmailDocuments'
+import { formatDate } from '../../../../../../lib/utils/formatDate'
+
+const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 const DOCUMENT_TYPES = [
-  { type: 'budget',       label: 'Presupuesto' },
-  { type: 'start_letter', label: 'Carta inicio'  },
-  { type: 'end_letter',   label: 'Carta fin'     },
+  { type: 'budget', label: 'Presupuesto' },
+  { type: 'start_letter', label: 'Carta inicio' },
+  { type: 'end_letter', label: 'Carta fin' },
 ]
 
 export default function TreatmentDetailClient({
-  paciente,      // viene del ServerComponent
-  tratamiento: initialTratamiento,    // viene del ServerComponent
+  paciente,
+  tratamiento: initialTratamiento,
 }) {
+  const [tratamiento, setTratamiento] = useState(initialTratamiento)
 
-  const [tratamiento, setTratamiento] = useState(initialTratamiento);
-  const [isEditingCost, setIsEditingCost] = useState(false);
-  const [editableCost, setEditableCost] = useState(tratamiento?.total_cost || 0);
-  const [isSavingCost, setIsSavingCost] = useState(false);
-  const [costAlert, setCostAlert] = useState({ open: false, message: '', severity: 'success' });
+  // Costo editable
+  const [isEditingCost, setIsEditingCost] = useState(false)
+  const [editableCost, setEditableCost] = useState(
+    initialTratamiento?.total_cost ?? 0
+  )
+  const [costAlert, setCostAlert] = useState({
+    open: false,
+    message: '',
+    severity: 'success', // 'success' | 'error'
+  })
 
-
-  // hook para traer / CRUD documentos
- const {
-    documents,
+  // Documentos (hook)
+  const {
+    documents = [],
     loading,
     error,
-    isUpdating, // Se usa en lugar de isSavingCost
+    isUpdating,
     fetchDocuments,
     createDocument,
     deleteDocument,
-    updateCost, // Se importa la nueva función
+    updateCost,
   } = useTreatmentDocuments(paciente.id, tratamiento?.treatment_id)
 
-  // hook para enviar por email
-  const {
-    alert: emailAlert,
-    loadingLabels,
-    sendDocuments,
-    closeAlert
-  } = useEmailDocuments()
+  // Email (hook)
+  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } =
+    useEmailDocuments()
 
-  // UI local
-  const [isModalOpen, setIsModalOpen]     = useState(false)
+  // UI subida docs
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDocType, setSelectedType] = useState('')
-  const [newDate, setNewDate]             = useState('')
-  const [newFiles, setNewFiles]           = useState([])
-  const [previewFile, setPreviewFile]     = useState(null)
+  const [newDate, setNewDate] = useState('')
+  const [newFiles, setNewFiles] = useState([])
+  const [previewFile, setPreviewFile] = useState(null)
 
-  const handleOpenModal = type => {
+  const selectedDocLabel = useMemo(() => {
+    return DOCUMENT_TYPES.find((d) => d.type === selectedDocType)?.label || ''
+  }, [selectedDocType])
+
+  const money = useMemo(() => {
+    try {
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+      }).format(Number(tratamiento?.total_cost ?? 0))
+    } catch {
+      return `${tratamiento?.total_cost ?? 0}`
+    }
+  }, [tratamiento?.total_cost])
+
+  const handleOpenModal = (type) => {
     setSelectedType(type)
     setIsModalOpen(true)
   }
+
   const handleCloseModal = async () => {
     setIsModalOpen(false)
     setSelectedType('')
@@ -95,75 +114,83 @@ export default function TreatmentDetailClient({
     await fetchDocuments()
   }
 
-  const handleUpdateCost = async () => {
-    const success = await updateCost(editableCost);
-
-    if (success) {
-      // Si el hook confirma el éxito, actualizamos la UI
-      setTratamiento(prev => ({ ...prev, total_cost: parseFloat(editableCost) }));
-      setIsEditingCost(false);
-      setCostAlert({ open: true, message: 'Costo actualizado exitosamente.', severity: 'success' });
-    } else {
-      // Si el hook reporta un error, mostramos la alerta con el error del hook
-      setCostAlert({ open: true, message: error || 'Ocurrió un error.', severity: 'error' });
-    }
-  };
-
   const handleSaveDocument = async () => {
     if (!newDate || newFiles.length === 0) {
-      alert('Fecha y archivos obligatorios')
+      window.alert('Fecha y archivos obligatorios')
       return
     }
+
     const fd = new FormData()
     fd.append('created_at', newDate)
     fd.append('document_type', selectedDocType)
-    newFiles.forEach(f => fd.append('file', f))
+    newFiles.forEach((f) => fd.append('file', f))
+
     await createDocument(fd)
     await handleCloseModal()
   }
 
-  const handleDelete = async id => {
-    if (!confirm('¿Eliminar este documento?')) return
+  const handleDelete = async (id) => {
+    if (!window.confirm('¿Eliminar este documento?')) return
     await deleteDocument(id)
     await fetchDocuments()
   }
 
-  console.log(documents)
+  const handleUpdateCost = async () => {
+    const success = await updateCost(editableCost)
 
-    const renderCard = ({ type, label }) => {
-    const docs = documents.filter(d => d.document_type === type)
-    const isEmailLoading = loadingLabels.has(label)
+    if (success) {
+      setTratamiento((prev) => ({
+        ...prev,
+        total_cost: parseFloat(editableCost),
+      }))
+      setIsEditingCost(false)
+      setCostAlert({
+        open: true,
+        message: 'Costo actualizado exitosamente.',
+        severity: 'success',
+      })
+    } else {
+      setCostAlert({
+        open: true,
+        message: error || 'Ocurrió un error.',
+        severity: 'error',
+      })
+    }
+  }
+
+  const renderDocCard = ({ type, label }) => {
+    const docs = documents.filter((d) => d.document_type === type)
+    const isEmailLoading = Boolean(loadingLabels?.has?.(label))
+
     return (
-      <Card key={type}
-        sx={{
-          borderRadius: 1,
-          border: "2px solid transparent",
-          "&:hover": { borderColor: "#B2C6FB" },
-          width: { xs: "100%", lg: "32%" },
-        }}>
-        <CardContent>
-          <Typography fontWeight="bold">{label}</Typography>
-          
-          {/* La lógica de la fecha ahora está dentro de la comprobación de `docs` */}
+      <Card
+        key={type}
+        className={cx(
+          'w-full lg:w-[32%] border-2 border-transparent transition',
+          'hover:border-[#B2C6FB] hover:shadow-sm',
+          'dark:hover:border-[#B2C6FB]/60 dark:hover:shadow-black/30'
+        )}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold">{label}</p>
+            {docs.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {formatDate(docs[0].created_at)}
+              </p>
+            ) : null}
+          </div>
+
           {docs.length > 0 ? (
-            <>
-              {/* SE MUESTRA LA FECHA DEL DOCUMENTO */}
-              <Box display="flex" mt={1}>
-                <Typography variant="body2" fontWeight={600} mr={1}>
-                  Fecha:
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(docs[0].created_at)}
-                </Typography>
-              </Box>
-              
-              <Box display="flex" flexDirection="column" gap={1} mt={2}>
-                {docs.map(doc => {
-                  const isPdf = doc.file_url.endsWith('.pdf')
-                  const fileName = doc.file_url.split('/').pop()
-                  return (
-                <Box key={doc.id} position="relative">
-                    <Box
+            <div className="mt-3 flex flex-col gap-2">
+              {docs.map((doc) => {
+                const isPdf = doc.file_url?.toLowerCase?.().endsWith('.pdf')
+                const fileName = doc.file_url?.split('/').pop() || 'archivo'
+
+                return (
+                  <div key={doc.id} className="relative">
+                    <div
+                      className="h-[100px] w-full overflow-hidden rounded-md border cursor-pointer"
                       onClick={() =>
                         setPreviewFile({
                           preview: doc.file_url,
@@ -171,13 +198,6 @@ export default function TreatmentDetailClient({
                           name: fileName,
                         })
                       }
-                      sx={{
-                        width: '100%',
-                        height: 100,
-                        borderRadius: 1,
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                      }}
                     >
                       {isPdf ? (
                         <object
@@ -185,162 +205,187 @@ export default function TreatmentDetailClient({
                           type="application/pdf"
                           width="100%"
                           height="100%"
-                          style={{ pointerEvents: 'none', cursor: 'pointer' }}
+                          style={{ pointerEvents: 'none' }}
                         />
                       ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={doc.file_url}
                           alt={label}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            borderRadius: 4,
-                          }}
+                          className="h-full w-full object-cover"
                         />
                       )}
-                    </Box>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(doc.id)}
-                      sx={{
-                        position: 'absolute',
-                        top: 4,
-                        right: 4,
-                        bgcolor: 'rgba(255,255,255,0.7)',
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 h-8 w-8 bg-background/70 hover:bg-background"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(doc.id)
                       }}
+                      aria-label="Eliminar documento"
+                      title="Eliminar"
                     >
-                      <DeleteForeverIcon />
-                    </IconButton>
-                  </Box>
-                  )
-                })}
-              </Box>
-            </>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
           ) : (
-            <Typography variant="body2" color="textSecondary" mt={2}>
-              No hay documentos
-            </Typography>
+            <p className="mt-3 text-sm text-muted-foreground">No hay documentos</p>
           )}
         </CardContent>
 
-                <CardActions sx={{ justifyContent: 'space-between' }}>
-          <Button variant={docs.length > 0 ? 'outlined' : 'contained'}
+        <CardFooter className="flex items-center justify-between gap-2 p-4 pt-0">
+          <Button
+            type="button"
+            variant={docs.length > 0 ? 'outline' : 'default'}
             onClick={() => handleOpenModal(type)}
           >
             {docs.length > 0 ? 'Actualizar' : 'Subir'}
           </Button>
+
           <Button
-            startIcon={isEmailLoading ? <CircularProgress size={16} /> : <EmailIcon />}
+            type="button"
+            variant="outline"
+            disabled={docs.length === 0 || isEmailLoading}
             onClick={() =>
               sendDocuments({
                 to: paciente.email,
-                docs: docs.map(d => d.file_url),
+                docs: docs.map((d) => d.file_url),
                 label,
                 treatmentName: tratamiento?.service_name,
-                patientName: tratamiento.nombre,
+                patientName: `${paciente?.nombre ?? ''} ${paciente?.apellidos ?? ''}`.trim(),
               })
             }
-            disabled={docs.length===0 || isEmailLoading}
+            className="gap-2"
           >
-            {isEmailLoading ? 'Enviando…' : 'Enviar por mail'}
+            {isEmailLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando…
+              </>
+            ) : (
+              <>
+                <Mail className="h-4 w-4" />
+                Enviar
+              </>
+            )}
           </Button>
-        </CardActions>
+        </CardFooter>
       </Card>
-    )}
+    )
+  }
 
   return (
-    <Box>
-      <Box display="flex" alignItems="center" mb={3}>
-        <Typography fontWeight={600} mr={1}>Costo del tratamiento:</Typography>
-        
-       {isEditingCost ? (
-          <Box display="flex" alignItems="center" gap={1}>
-            <TextField
+    <div className="space-y-4">
+      {/* Costo */}
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="font-semibold">Costo del tratamiento:</p>
+
+        {isEditingCost ? (
+          <div className="flex items-center gap-2">
+            <Input
               type="number"
-              size="small"
-              variant="outlined"
               value={editableCost}
               onChange={(e) => setEditableCost(e.target.value)}
-              disabled={isUpdating} 
-              sx={{ width: '120px' }}
+              disabled={isUpdating}
+              className="w-[140px]"
             />
-            <IconButton onClick={handleUpdateCost} color="primary" disabled={isUpdating}>
-              {isUpdating ? <CircularProgress size={20} /> : <CheckIcon />}
-            </IconButton>
-            <IconButton onClick={() => setIsEditingCost(false)} disabled={isUpdating}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        ) : (
-          <Box
-            display="flex"
-            alignItems="center"
-            gap={1}
-            sx={{
-              cursor: 'pointer',
-              '& .edit-icon-button': {
-                visibility: 'hidden',
-                opacity: 0,
-                transition: 'opacity 0.2s',
-              },
-              '&:hover .edit-icon-button': {
-                visibility: 'visible',
-                opacity: 1,
-              },
-            }}
-          >
-            <Typography variant="h6">
-              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-                .format(tratamiento?.total_cost)}
-            </Typography>
-            
-            {/* Se añade una clase para poder seleccionarlo con CSS */}
-            <IconButton
-              className="edit-icon-button"
-              onClick={() => setIsEditingCost(true)}
-              size="small"
+
+            <Button
+              type="button"
+              size="icon"
+              onClick={handleUpdateCost}
+              disabled={isUpdating}
+              aria-label="Guardar costo"
+              title="Guardar"
             >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          </Box>
+              {isUpdating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setIsEditingCost(false)}
+              disabled={isUpdating}
+              aria-label="Cancelar"
+              title="Cancelar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div
+            className={cx(
+              'group flex items-center gap-2 rounded-md px-2 py-1',
+              'hover:bg-muted/40 cursor-pointer'
+            )}
+            onClick={() => setIsEditingCost(true)}
+            role="button"
+            tabIndex={0}
+          >
+            <p className="text-lg font-semibold">{money}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+              aria-label="Editar costo"
+              title="Editar"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsEditingCost(true)
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
         )}
-      </Box>
+      </div>
 
-      {loading && <CircularProgress />}
-      {error   && <Alert severity="error">{error}</Alert>}
+      {/* Carga / error */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando documentos…
+        </div>
+      ) : null}
 
-<Accordion sx={{ mb: 2, backgroundColor: "#E8EFFF" }}>
-  <AccordionSummary expandIcon={<ExpandMore />}>
-    <DescriptionIcon sx={{ mr: 1 }} />
-    <Typography fontWeight="bold">
-      Documentos ({documents.length})
-    </Typography>
-  </AccordionSummary>
-  <AccordionDetails>
-    <Box
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 1,
-        // en pantallas muy pequeñas, columnas; desde sm en fila
-        flexDirection: { xs: "column", sm: "row" },
-        // opcional: centra en xs
-        alignItems: { xs: "stretch", sm: "flex-start" },
-        justifyContent:"space-between"
-      }}
-    >
-      {DOCUMENT_TYPES.map((type) =>
-        renderCard(type, {
-          // añade en el renderCard un sx para controlar el ancho de cada tarjeta
-          width: { xs: "100%", sm: "40%", lg: "33%" },
-        })
-      )}
-    </Box>
-  </AccordionDetails>
-</Accordion>
+      {error ? (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{String(error)}</AlertDescription>
+        </Alert>
+      ) : null}
 
+      {/* Documentos */}
+      <Accordion type="single" collapsible defaultValue="docs">
+        <AccordionItem value="docs" className="border rounded-md">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="font-semibold">
+                Documentos ({documents.length})
+              </span>
+            </div>
+          </AccordionTrigger>
+
+          <AccordionContent className="px-4 pb-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 justify-between">
+              {DOCUMENT_TYPES.map((d) => renderDocCard(d))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* evidencias adicionales */}
       <TreatmentDetailEvidences
@@ -348,10 +393,11 @@ export default function TreatmentDetailClient({
         treatmentId={tratamiento?.treatment_id}
       />
 
+      {/* Modales (si luego quieres, migramos estos a shadcn Dialog también) */}
       <UploadFilesModal
         open={isModalOpen}
         onClose={handleCloseModal}
-        title={`Subir ${selectedDocType}`}
+        title={`Subir ${selectedDocLabel || selectedDocType}`}
         newRecordDate={newDate}
         setNewRecordDate={setNewDate}
         setNewRecordFiles={setNewFiles}
@@ -364,27 +410,43 @@ export default function TreatmentDetailClient({
         file={previewFile}
       />
 
-      <Snackbar
-        open={emailAlert.open}
-        autoHideDuration={4000}
-        onClose={closeAlert}
-        anchorOrigin={{ vertical:'bottom', horizontal:'center' }}
-      >
-        <Alert onClose={closeAlert} severity={emailAlert.severity}>
-          {emailAlert.message}
-        </Alert>
-      </Snackbar>
+      {/* Alerts flotantes (reemplazo de Snackbar) */}
+      {emailAlert?.open ? (
+        <div className="fixed bottom-6 right-6 z-50 w-[320px]">
+          <Alert variant={emailAlert.severity === 'error' ? 'destructive' : 'default'}>
+            <AlertTitle>
+              {emailAlert.severity === 'error' ? 'Error' : 'Listo'}
+            </AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>{emailAlert.message}</span>
+              <Button variant="ghost" size="icon" onClick={closeAlert} aria-label="Cerrar">
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
 
-      <Snackbar
-      open={costAlert.open}
-      autoHideDuration={4000}
-      onClose={() => setCostAlert(prev => ({ ...prev, open: false }))}
-      anchorOrigin={{ vertical:'bottom', horizontal:'center' }}
-    >
-      <Alert onClose={() => setCostAlert(prev => ({ ...prev, open: false }))} severity={costAlert.severity} sx={{ width: '100%' }}>
-        {costAlert.message}
-      </Alert>
-    </Snackbar>
-    </Box>
+      {costAlert.open ? (
+        <div className="fixed bottom-24 right-6 z-50 w-[320px]">
+          <Alert variant={costAlert.severity === 'error' ? 'destructive' : 'default'}>
+            <AlertTitle>
+              {costAlert.severity === 'error' ? 'Error' : 'Listo'}
+            </AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>{costAlert.message}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCostAlert((p) => ({ ...p, open: false }))}
+                aria-label="Cerrar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
+    </div>
   )
 }

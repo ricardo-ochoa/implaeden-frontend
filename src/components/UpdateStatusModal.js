@@ -1,51 +1,72 @@
-import React from 'react';
+// src/components/UpdateStatusModal.jsx
+'use client'
+
+import React from 'react'
+
+// shadcn/ui
+import { Button } from '@/components/ui/button'
 import {
-  Box,
-  Button,
-  Modal,
-  Typography,
-  MenuItem,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
   Select,
-  FormControl,
-  InputLabel,
-} from '@mui/material';
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 
-const statusOptions = ['Por Iniciar', 'En proceso', 'Terminado'];
+const statusOptions = ['Por Iniciar', 'En proceso', 'Terminado']
 
-const UpdateStatusModal = ({
+export default function UpdateStatusModal({
   open,
   onClose,
-  treatment,
+  treatment, // lo dejo por compat, por si lo necesitas para algo (no se usa aquí)
   newStatus,
   setNewStatus,
   onSave,
-}) => {
+}) {
   return (
-    <Modal open={open} onClose={onClose} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Box sx={{ bgcolor: 'background.paper', p: 4, borderRadius: 2, width: '90%', maxWidth: 400 }}>
-        <Typography variant="h6" mb={2}>
-          Cambiar estado del tratamiento
-        </Typography>
-        <FormControl fullWidth>
-          <InputLabel id="status-select-label">Estado</InputLabel>
-          <Select
-            labelId="status-select-label"
-            value={newStatus}
-            label="Estado"
-            onChange={(e) => setNewStatus(e.target.value)}
-          >
-            {statusOptions.map((option) => (
-              <MenuItem key={option} value={option}>{option}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button onClick={onSave} variant="contained" color="primary">Guardar</Button>
-        </Box>
-      </Box>
-    </Modal>
-  );
-};
+    <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>Cambiar estado del tratamiento</DialogTitle>
+        </DialogHeader>
 
-export default UpdateStatusModal;
+        <div className="space-y-2">
+          <Label>Estado</Label>
+          <Select value={newStatus || ''} onValueChange={(v) => setNewStatus?.(v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecciona un estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={!newStatus}
+          >
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

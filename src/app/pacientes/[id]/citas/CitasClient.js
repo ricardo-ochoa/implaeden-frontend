@@ -1,22 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import {
-  Box,
-  Button,
-  Alert,
-  Grid,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogActions,
-} from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
-import { useCitas } from '../../../../../lib/hooks/useCitas'
-import CitasTable from '@/components/citas/CitasTable'
-import CitaModal from '@/components/citas/CitaModal'
+import { useState } from 'react'
 import useSWR from 'swr'
 import api, { fetcher } from '../../../../../lib/api'
+
+import CitasTable from '@/components/citas/CitasTable'
+import CitaModal from '@/components/citas/CitaModal'
+
+// shadcn/ui
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+// icon (lucide)
+import { Plus, Loader2 } from 'lucide-react'
+
+// mini helper
+const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 export default function CitasClient({
   paciente,
@@ -25,155 +32,139 @@ export default function CitasClient({
 }) {
   const pacienteId = paciente.id
 
-  // 1. SWR reemplaza a `useCitas` y al estado local `citasLoad`
+  // SWR
   const {
-    data: citas, // `data` de SWR es ahora nuestra lista de citas
+    data: citas,
     error: errorCitas,
     isLoading: loadingCitas,
-    mutate, // La función para refrescar los datos
-  } = useSWR(
-    `/pacientes/${pacienteId}/citas`,
-    fetcher,
-    { fallbackData: initialCitas } // Usa los datos del servidor para la carga inicial
-  )
+    mutate,
+  } = useSWR(`/pacientes/${pacienteId}/citas`, fetcher, {
+    fallbackData: initialCitas,
+  })
 
-  // El resto de los estados de la UI se mantienen
-  const [servicios] = useState(initialServicios) // Los servicios no cambian, un useState simple es suficiente
+  // UI state
+  const [servicios] = useState(initialServicios)
   const [modalOpen, setModalOpen] = useState(false)
   const [mensaje, setMensaje] = useState('')
   const [selectedCita, setSelectedCita] = useState(null)
+
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [citaToDelete, setCitaToDelete] = useState(null)
 
   const formatearFechaHora = (isoString) => {
-    // 1. Verifica si el valor de entrada es nulo o indefinido
-    if (!isoString) {
-      return 'Fecha no disponible';
-    }
-
-    const fecha = new Date(isoString);
-
-    // 2. Verifica si la fecha creada es válida
-    if (isNaN(fecha.getTime())) {
-      return 'Fecha inválida';
-    }
-
-    // 3. Si todo es correcto, formatea la fecha
+    if (!isoString) return 'Fecha no disponible'
+    const fecha = new Date(isoString)
+    if (isNaN(fecha.getTime())) return 'Fecha inválida'
     return fecha.toLocaleString('es-ES', {
-      year: 'numeric', month: 'long', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
-
-  // 2. Simplificamos los handlers para usar `api` y `mutate`
-const handleSave = async form => {
-  const { appointment_at, service_id } = form;
-  if (!appointment_at || !service_id) {
-    setMensaje('Por favor complete fecha y tratamiento');
-    return false;
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
-  try {
-    // --- CORRECCIÓN AQUÍ ---
-    const promise = selectedCita
-      // La URL de PUT debe incluir el ID del paciente para coincidir con el backend
-      ? api.put(`/pacientes/${pacienteId}/citas/${selectedCita.id}`, form)
-      // La URL de POST ya era correcta
-      : api.post(`/pacientes/${pacienteId}/citas`, form);
-    
-    await promise;
-    
-    mutate(); // Refresca los datos con SWR
-    
-    setMensaje(selectedCita ? 'Cita actualizada exitosamente' : 'Cita creada exitosamente');
-    handleCloseModal();
-    return true;
-  } catch (err) {
-    setMensaje('Error guardando la cita');
-    return false;
-  } finally {
-    setTimeout(() => setMensaje(''), 3000);
+  const flash = (text) => {
+    setMensaje(text)
+    setTimeout(() => setMensaje(''), 3000)
   }
-}
-
-  const handleEdit = cita => {
-    setSelectedCita(cita);
-    setModalOpen(true);
-  }
-
-  const handleRequestDelete = id => {
-    const cita = citas.find(c => c.id === id);
-    setCitaToDelete(cita);
-    setConfirmOpen(true);
-  }
-
-const handleConfirmDelete = async () => {
-  if (!citaToDelete) return;
-  try {
-    await api.delete(`/pacientes/${pacienteId}/citas/${citaToDelete.id}`);
-    mutate(); // Refresca los datos con SWR
-    setMensaje('Cita eliminada exitosamente');
-  } catch (err) {
-    setMensaje('Error eliminando la cita');
-  } finally {
-    setTimeout(() => setMensaje(''), 3000);
-    setConfirmOpen(false);
-  }
-};
 
   const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedCita(null);
+    setModalOpen(false)
+    setSelectedCita(null)
   }
 
+  const handleSave = async (form) => {
+    const { appointment_at, service_id } = form
+    if (!appointment_at || !service_id) {
+      flash('Por favor complete fecha y tratamiento')
+      return false
+    }
+
+    try {
+      const promise = selectedCita
+        ? api.put(`/pacientes/${pacienteId}/citas/${selectedCita.id}`, form)
+        : api.post(`/pacientes/${pacienteId}/citas`, form)
+
+      await promise
+      await mutate()
+
+      flash(selectedCita ? 'Cita actualizada exitosamente' : 'Cita creada exitosamente')
+      handleCloseModal()
+      return true
+    } catch (err) {
+      flash('Error guardando la cita')
+      return false
+    }
+  }
+
+  const handleEdit = (cita) => {
+    setSelectedCita(cita)
+    setModalOpen(true)
+  }
+
+  const handleRequestDelete = (id) => {
+    const cita = (citas || []).find((c) => c.id === id)
+    setCitaToDelete(cita || null)
+    setConfirmOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!citaToDelete) return
+
+    try {
+      await api.delete(`/pacientes/${pacienteId}/citas/${citaToDelete.id}`)
+      await mutate()
+      flash('Cita eliminada exitosamente')
+    } catch (err) {
+      flash('Error eliminando la cita')
+    } finally {
+      setConfirmOpen(false)
+      setCitaToDelete(null)
+    }
+  }
+
+  const isSuccess = mensaje.includes('exitosamente')
+
   return (
-    <div>
-      {mensaje && (
-        <Alert
-          severity={mensaje.includes('exitosamente') ? 'success' : 'error'}
-          sx={{
-            position: 'fixed',
-            top: theme => theme.spacing(2),
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: theme => theme.zIndex.snackbar,
-          }}
-        >
-          {mensaje}
-        </Alert>
-      )}
+    <div className="relative">
+      {/* Toast simple (shadcn Alert fijo) */}
+      {mensaje ? (
+        <div className="fixed top-4 left-1/2 z-50 w-[min(520px,calc(100%-24px))] -translate-x-1/2">
+          <Alert className={cx(isSuccess ? 'border-emerald-500/40' : 'border-destructive/40')} variant={isSuccess ? 'default' : 'destructive'}>
+            <AlertTitle>{isSuccess ? 'Listo' : 'Error'}</AlertTitle>
+            <AlertDescription>{mensaje}</AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
 
-      {errorCitas && (
-        <Alert
-          severity="error"
-          sx={{
-            position: 'fixed',
-            top: theme => theme.spacing(10),
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: theme => theme.zIndex.snackbar,
-          }}
-        >
-          Error cargando citas: {errorCitas}
-        </Alert>
-      )}
+      {errorCitas ? (
+        <div className="fixed top-20 left-1/2 z-50 w-[min(640px,calc(100%-24px))] -translate-x-1/2">
+          <Alert variant="destructive">
+            <AlertTitle>Error cargando citas</AlertTitle>
+            <AlertDescription>
+              {typeof errorCitas === 'string' ? errorCitas : 'Ocurrió un error al cargar las citas.'}
+            </AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
 
-      <Grid container>
-        <Grid item xs={12} sx={{ textAlign: 'right', mb: 1 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setModalOpen(true)}
-          >
-            Nueva Cita
-          </Button>
-        </Grid>
-        <Grid item xs={12}>
-          {loadingCitas ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
+      {/* Header */}
+      <div className="flex items-center justify-end mb-3">
+        <Button onClick={() => setModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva Cita
+        </Button>
+      </div>
+
+      {/* Body */}
+      <div className="rounded-lg border bg-card">
+        {loadingCitas ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <div className="p-2 md:p-4">
             <CitasTable
               citas={citas || []}
               servicios={servicios}
@@ -181,10 +172,11 @@ const handleConfirmDelete = async () => {
               onEdit={handleEdit}
               onDelete={handleRequestDelete}
             />
-          )}
-        </Grid>
-      </Grid>
+          </div>
+        )}
+      </div>
 
+      {/* Modal de crear/editar (si esto sigue siendo MUI adentro, puede causar conflicto con Radix; ideal migrarlo también) */}
       <CitaModal
         open={modalOpen}
         onClose={handleCloseModal}
@@ -193,14 +185,38 @@ const handleConfirmDelete = async () => {
         initialData={selectedCita}
       />
 
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>¿Confirmas eliminar esta cita?</DialogTitle>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-          <Button color="error" variant="contained" onClick={handleConfirmDelete}>
-            Eliminar
-          </Button>
-        </DialogActions>
+      {/* Confirm delete (shadcn Dialog) */}
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(v) => {
+          setConfirmOpen(v)
+          if (!v) setCitaToDelete(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Confirmas eliminar esta cita?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmOpen(false)
+                setCitaToDelete(null)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </div>
   )

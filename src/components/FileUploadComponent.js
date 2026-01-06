@@ -1,26 +1,22 @@
-'use client';
+'use client'
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  List, 
-  ListItem, 
-  ListItemText, 
-  ListItemSecondaryAction, 
-  IconButton
-} from '@mui/material';
-import { Upload as UploadIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import imageCompression from 'browser-image-compression';
-import FilePreviewModal from './FilePreviewModal';
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
+import imageCompression from 'browser-image-compression'
+import FilePreviewModal from './FilePreviewModal'
+
+// shadcn/ui
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+
+// icons (lucide)
+import { Upload, Trash2, FileText, Image as ImageIcon, Video } from 'lucide-react'
 
 export default function FileUploadComponent({ onFileUpload }) {
-  const [files, setFiles] = useState([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState(null);
+  const [files, setFiles] = useState([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewFile, setPreviewFile] = useState(null)
 
   const compressImage = async (file) => {
     try {
@@ -28,48 +24,44 @@ export default function FileUploadComponent({ onFileUpload }) {
         maxSizeMB: 1,
         maxWidthOrHeight: 1920,
         useWebWorker: true,
-      };
-      return await imageCompression(file, options);
+      }
+      return await imageCompression(file, options)
     } catch {
-      return file;
+      return file
     }
-  };
+  }
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
       const processed = await Promise.all(
         acceptedFiles.map(async (file) => {
-          const previewUrl = URL.createObjectURL(file);
+          const previewUrl = URL.createObjectURL(file)
 
+          // imágenes: comprimir + regenerar preview
           if (file.type.startsWith('image/')) {
-            // comprime la imagen
-            const compressed = await compressImage(file);
-            URL.revokeObjectURL(previewUrl);
-            const compressedPreview = URL.createObjectURL(compressed);
-            return Object.assign(compressed, { preview: compressedPreview });
+            const compressed = await compressImage(file)
+            URL.revokeObjectURL(previewUrl)
+            const compressedPreview = URL.createObjectURL(compressed)
+            return Object.assign(compressed, { preview: compressedPreview })
           }
 
-          if (file.type === 'application/pdf') {
-            return Object.assign(file, { preview: previewUrl });
+          // pdf/video: solo preview
+          if (file.type === 'application/pdf' || file.type.startsWith('video/')) {
+            return Object.assign(file, { preview: previewUrl })
           }
 
-          if (file.type.startsWith('video/')) {
-            // vídeo: no compress, solo preview
-            return Object.assign(file, { preview: previewUrl });
-          }
-
-          // formato no soportado
-          URL.revokeObjectURL(previewUrl);
-          return null;
+          // no soportado
+          URL.revokeObjectURL(previewUrl)
+          return null
         })
-      );
+      )
 
-      const valid = processed.filter(Boolean);
-      setFiles(prev => [...prev, ...valid]);
-      onFileUpload(valid);
+      const valid = processed.filter(Boolean)
+      setFiles((prev) => [...prev, ...valid])
+      onFileUpload?.(valid)
     },
     [onFileUpload]
-  );
+  )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -77,109 +69,171 @@ export default function FileUploadComponent({ onFileUpload }) {
       'image/*': [],
       'application/pdf': [],
       'video/*': [],
-    }
-  });
+    },
+  })
 
   const removeFile = (index) => {
-    setFiles(prev => {
-      const upd = [...prev];
-      const [removed] = upd.splice(index, 1);
-      if (removed.preview) URL.revokeObjectURL(removed.preview);
-      return upd;
-    });
-  };
+    setFiles((prev) => {
+      const upd = [...prev]
+      const [removed] = upd.splice(index, 1)
+      if (removed?.preview) URL.revokeObjectURL(removed.preview)
+      return upd
+    })
+  }
 
-  // cleanup de previews al desmontar
+  // cleanup previews al desmontar
   useEffect(() => {
     return () => {
-      files.forEach(f => {
-        if (f.preview) URL.revokeObjectURL(f.preview);
-      });
-    };
-  }, [files]);
+      files.forEach((f) => {
+        if (f?.preview) URL.revokeObjectURL(f.preview)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 👈 solo un cleanup final
+
+  const prettySize = useMemo(() => {
+    return (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  }, [])
+
+  const FileThumb = ({ file }) => {
+    const common = 'h-14 w-14 rounded-md border bg-muted overflow-hidden'
+    if (file.type.startsWith('image/')) {
+      return (
+        <div className={common}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={file.preview}
+            alt={file.name}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )
+    }
+    if (file.type === 'application/pdf') {
+      return (
+        <div className={`${common} flex items-center justify-center`}>
+          <FileText className="h-6 w-6 text-muted-foreground" />
+        </div>
+      )
+    }
+    if (file.type.startsWith('video/')) {
+      return (
+        <div className={common}>
+          <video
+            src={file.preview}
+            muted
+            loop
+            playsInline
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )
+    }
+    return (
+      <div className={`${common} flex items-center justify-center`}>
+        <ImageIcon className="h-6 w-6 text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const TypeIcon = ({ file }) => {
+    if (file.type.startsWith('image/')) return <ImageIcon className="h-4 w-4" />
+    if (file.type === 'application/pdf') return <FileText className="h-4 w-4" />
+    if (file.type.startsWith('video/')) return <Video className="h-4 w-4" />
+    return <Upload className="h-4 w-4" />
+  }
 
   return (
     <>
-      <Box sx={{ p:4, border:'2px dashed #ccc', borderRadius:1 }}>
-        <div {...getRootProps()} style={{ cursor:'pointer', marginBottom:16 }}>
+      <Card className="p-4">
+        {/* Dropzone */}
+        <div
+          {...getRootProps()}
+          className={[
+            'rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer',
+            isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/30',
+          ].join(' ')}
+        >
           <input {...getInputProps()} />
-          <Box textAlign="center">
-            <UploadIcon fontSize="large" color="action" />
-            <Typography variant="h6" sx={{ my:1 }}>
+
+          <div className="mx-auto flex max-w-md flex-col items-center gap-2">
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm font-medium">
               {isDragActive
                 ? 'Suelta los archivos aquí'
                 : 'Arrastra o haz clic para seleccionar (PNG, JPG, PDF, MP4...)'}
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<UploadFileIcon />}
-              sx={{ backgroundColor: '#788BFF', fontWeight: 550 }}
-            >
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Imágenes se comprimen automáticamente (hasta ~1MB).
+            </p>
+
+            <Button type="button" className="mt-2">
               Seleccionar Archivos
             </Button>
-          </Box>
+          </div>
         </div>
 
-        {files.length > 0 && (
-          <List>
-            {files.map((file, idx) => (
-              <ListItem key={idx} sx={{ bgcolor:'#f5f5f5', mb:1, borderRadius:1 }}>
-                <Box
-                  sx={{
-                    width:56, height:56, mr:2, border:'1px solid #ccc',
-                    borderRadius:1, overflow:'hidden', cursor:'pointer'
-                  }}
-                  onClick={() => {
-                    setPreviewFile(file);
-                    setPreviewOpen(true);
-                  }}
-                >
-                  {file.type.startsWith('image/') ? (
-                    <img
-                      src={file.preview}
-                      alt={file.name}
-                      style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                    />
-                  ) : file.type === 'application/pdf' ? (
-                    <object
-                      data={file.preview}
-                      type="application/pdf"
-                      width="100%"
-                      height="100%"
-                      style={{ pointerEvents:'none' }}
-                    />
-                  ) : (
-                    <video
-                      src={file.preview}
-                      muted
-                      loop
-                      style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                    />
-                  )}
-                </Box>
+        {/* Lista */}
+        {files.length > 0 ? (
+          <div className="mt-4">
+            <div className="mb-2 text-sm text-muted-foreground">
+              {files.length} archivo(s) seleccionado(s)
+            </div>
 
-                <ListItemText
-                  primary={file.name}
-                  secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`}
-                />
+            <ScrollArea className="h-[280px] pr-2">
+              <div className="space-y-2">
+                {files.map((file, idx) => (
+                  <div
+                    key={`${file.name}-${file.lastModified}-${idx}`}
+                    className="flex items-center gap-3 rounded-lg border bg-background p-2"
+                  >
+                    <button
+                      type="button"
+                      className="shrink-0"
+                      onClick={() => {
+                        setPreviewFile(file)
+                        setPreviewOpen(true)
+                      }}
+                      title="Ver archivo"
+                    >
+                      <FileThumb file={file} />
+                    </button>
 
-                <ListItemSecondaryAction>
-                  <IconButton edge="end" onClick={() => removeFile(idx)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </ListItemSecondaryAction>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Box>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          <TypeIcon file={file} />
+                        </span>
+                        <p className="truncate text-sm font-medium">{file.name}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {prettySize(file.size)}
+                      </p>
+                    </div>
 
-      {/* Preview Modal */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => removeFile(idx)}
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        ) : null}
+      </Card>
+
+      {/* Preview Modal (lo dejas igual) */}
       <FilePreviewModal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         file={previewFile}
       />
     </>
-  );
+  )
 }
