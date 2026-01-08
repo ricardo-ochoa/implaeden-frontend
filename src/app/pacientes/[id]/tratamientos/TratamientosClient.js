@@ -207,10 +207,10 @@ export default function TratamientosClient({ paciente }) {
       </div>
 
       {/* Grid de tratamientos */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(treatments || []).map((treatment) => (
-          <div key={treatment.treatment_id} className="relative">
-            {/* Dropdown de acciones (reemplazo del Menu MUI) */}
+          <div key={treatment.treatment_id} className="relative min-w-0">
+            {/* Dropdown de acciones */}
             <div className="absolute right-2 top-2 z-10">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -240,17 +240,17 @@ export default function TratamientosClient({ paciente }) {
               </DropdownMenu>
             </div>
 
-            {/* Tu card existente */}
             <TreatmentCard
               treatment={treatment}
-              // ya no usamos onMenuOpen; mantenemos compat sin romper por si tu card lo llama
-              onMenuOpen={() => {}}
               onClick={() => handleCardClick(treatment.treatment_id)}
               onStatusClick={handleStatusClick}
+              showMenu={false}      // 👈 para no duplicar el botón interno
+              className="h-full"    // 👈 opcional: que todas queden “parejas” si el texto crece
             />
           </div>
         ))}
       </div>
+
 
       {/* Modales existentes */}
       <ModalServicio
