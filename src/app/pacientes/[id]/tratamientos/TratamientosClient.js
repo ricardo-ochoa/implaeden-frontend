@@ -97,32 +97,37 @@ export default function TratamientosClient({ paciente }) {
     setNewRecordFiles([])
   }
 
-  const handleSaveRecord = async () => {
-    if (!newRecordDate || !selectedService) return
-    try {
-      await api.post(`/servicios/patient/${paciente.id}`, {
-        service_id: selectedService,
-        service_date: newRecordDate,
-        total_cost: initialCost,
-      })
-      handleCloseModal()
-      fetchPatientTreatments()
-      setToast({
-        open: true,
-        variant: 'success',
-        title: 'Listo',
-        message: 'Tratamiento creado correctamente.',
-      })
-    } catch (err) {
-      console.error('Error al guardar el tratamiento:', err)
-      setToast({
-        open: true,
-        variant: 'error',
-        title: 'Error',
-        message: 'No se pudo guardar el tratamiento.',
-      })
-    }
+const handleSaveRecord = async () => {
+  if (!newRecordDate || !selectedService) return
+
+  try {
+    await api.post(`/pacientes/${paciente.id}/tratamientos`, {
+      service_id: selectedService,
+      service_date: newRecordDate,
+      total_cost: initialCost,
+
+    })
+
+    handleCloseModal()
+    fetchPatientTreatments()
+
+    setToast({
+      open: true,
+      variant: 'success',
+      title: 'Listo',
+      message: 'Tratamiento creado correctamente.',
+    })
+  } catch (err) {
+    console.error('Error al guardar el tratamiento:', err)
+    setToast({
+      open: true,
+      variant: 'error',
+      title: 'Error',
+      message: 'No se pudo guardar el tratamiento.',
+    })
   }
+}
+
 
   const handleStatusClick = (treatment) => {
     setSelectedTreatment(treatment)
@@ -130,32 +135,35 @@ export default function TratamientosClient({ paciente }) {
     setStatusModalOpen(true)
   }
 
-  const handleSaveStatus = async () => {
-    if (!selectedTreatment?.treatment_id || !newStatus) return
-    try {
-      await api.put(
-        `/servicios/tratamientos/${selectedTreatment.treatment_id}/status`,
-        { status: newStatus }
-      )
-      setStatusModalOpen(false)
-      setSelectedTreatment(null)
-      fetchPatientTreatments()
-      setToast({
-        open: true,
-        variant: 'success',
-        title: 'Listo',
-        message: 'Estado actualizado correctamente.',
-      })
-    } catch (err) {
-      console.error(err)
-      setToast({
-        open: true,
-        variant: 'error',
-        title: 'Error',
-        message: 'No se pudo actualizar el estado.',
-      })
-    }
+const handleSaveStatus = async () => {
+  if (!selectedTreatment?.treatment_id || !newStatus) return
+
+  try {
+    await api.put(
+      `/pacientes/${paciente.id}/tratamientos/${selectedTreatment.treatment_id}/status`,
+      { status: newStatus }
+    )
+
+    setStatusModalOpen(false)
+    setSelectedTreatment(null)
+    fetchPatientTreatments()
+
+    setToast({
+      open: true,
+      variant: 'success',
+      title: 'Listo',
+      message: 'Estado actualizado correctamente.',
+    })
+  } catch (err) {
+    console.error(err)
+    setToast({
+      open: true,
+      variant: 'error',
+      title: 'Error',
+      message: 'No se pudo actualizar el estado.',
+    })
   }
+}
 
   const handleDeleteRecord = async () => {
     if (!recordToDelete?.treatment_id) return

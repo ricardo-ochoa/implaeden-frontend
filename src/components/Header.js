@@ -9,6 +9,8 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { Settings } from "lucide-react";
 
 function NavLink({ href, children, active }) {
   return (
@@ -29,11 +31,17 @@ function NavLink({ href, children, active }) {
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const { logout, loading, isAuthenticated } = useAuth();
+  const { logout, loading, isAuthenticated, user } = useAuth();
 
   // ✅ usa theme + resolvedTheme para manejar "system"
   const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false)
+
+  const isAdmin =
+    user?.role === 'admin' ||
+    user?.rol === 'admin' ||
+    user?.isAdmin === true ||
+    user?.is_admin === true
 
   React.useEffect(() => {
     setMounted(true);
@@ -100,15 +108,36 @@ export default function Header() {
           <ThemeToggleButton />
 
           {isAuthenticated ? (
-            <Button variant="outline" onClick={handleLogout}>
+            <Button className="rounded-full" variant="outline" onClick={handleLogout}>
               Cerrar sesión
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => router.push("/login")}>
+            <Button className="rounded-full" variant="outline" onClick={() => router.push("/login")}>
               Iniciar sesión
             </Button>
           )}
+        {isAdmin ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="rounded-full" variant="outline" size="sm">
+                  <Settings />
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="end" className="min-w-[220px]">
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/servicios">Tratamientos / Servicios)</Link>
+                </DropdownMenuItem>
+
+                {/* Aquí luego metemos más secciones admin */}
+                {/* <DropdownMenuItem asChild>
+                  <Link href="/admin/usuarios">Usuarios</Link>
+                </DropdownMenuItem> */}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
+
       </div>
     </header>
   );
