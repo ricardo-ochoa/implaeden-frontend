@@ -1,34 +1,59 @@
-// src/components/TreatmentCard.jsx
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { formatDate } from '../../lib/utils/formatDate'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { MoreVertical, Pencil } from 'lucide-react'
+import { MoreVertical } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const cx = (...c) => c.filter(Boolean).join(' ')
 
-function getStatusVariant(status) {
+const toMoney = (n) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
+    Number(n || 0)
+  )
+
+const normalizeStatus = (raw) => {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (!v) return 'Por Iniciar'
+  if (v === 'terminado') return 'Terminado'
+  if (v === 'en proceso') return 'En proceso'
+  if (v === 'por iniciar') return 'Por Iniciar'
+  return 'Por Iniciar'
+}
+
+// ✅ Helper: intenta sacar nombre desde varias formas comunes
+const getServiceName = (obj) => {
+  return (
+    obj?.service_name ??
+    obj?.serviceName ??
+    obj?.tratamiento ??
+    obj?.name ??
+    obj?.service?.name ??
+    ''
+  )
+}
+
+const getCardBorderClass = (status) => {
   switch (status) {
     case 'Terminado':
-      return 'default'
+      return 'border-emerald-500'
     case 'En proceso':
-      return 'secondary'
+      return 'border-orange-400'
     default:
-      return 'outline'
+      return 'border-slate-200'
   }
 }
 
-function getStatusRingClass(status) {
+const getStatusBadgeClass = (status) => {
   switch (status) {
     case 'Terminado':
-      return 'ring-emerald-500/40 hover:ring-emerald-500/60'
+      return 'border-emerald-500 text-emerald-600'
     case 'En proceso':
-      return 'ring-amber-500/40 hover:ring-amber-500/60'
+      return 'border-orange-400 text-orange-500'
     default:
-      return 'ring-slate-400/40 hover:ring-slate-400/60'
+      return 'border-slate-400 text-slate-700'
   }
 }
 
@@ -38,51 +63,82 @@ export default function TreatmentCard({
   onClick,
   onStatusClick,
   className,
-  showMenu = true,
+  showMenu = false,
 }) {
-  const status = treatment?.status || 'Sin estado'
-  const statusVariant = getStatusVariant(status)
-  const ringClass = getStatusRingClass(status)
+const isGroup =
+  Boolean(treatment?.isGroup) ||
+  (treatment?.group_id != null && Array.isArray(treatment?.items) && treatment.items.length > 0)
+
+
+  const items = useMemo(() => {
+    if (!isGroup) {
+      return [
+        {
+          service_name: getServiceName(treatment),
+          total_cost: treatment?.total_cost,
+          status: treatment?.status,
+          service_date: treatment?.service_date,
+        },
+      ]
+    }
+
+    return (treatment?.items || []).map((it) => ({
+      service_name: getServiceName(it),
+      total_cost: it?.total_cost,
+      status: it?.status,
+      service_date: it?.service_date,
+    }))
+  }, [isGroup, treatment])
+
+  const status = useMemo(() => {
+    if (!isGroup) return normalizeStatus(treatment?.status)
+    if (treatment?.group_status) return normalizeStatus(treatment.group_status)
+
+    const statuses = items.map((x) => normalizeStatus(x?.status)).filter(Boolean)
+    if (statuses.length === 0) return 'Por Iniciar'
+
+    const allDone = statuses.every((s) => s === 'Terminado')
+    if (allDone) return 'Terminado'
+
+    const anyInProgress = statuses.some((s) => s === 'En proceso')
+    if (anyInProgress) return 'En proceso'
+
+    return 'Por Iniciar'
+  }, [isGroup, treatment, items])
+
+  const dateValue = isGroup
+    ? treatment?.group_start_date ||
+      treatment?.start_date ||
+      treatment?.items?.[0]?.service_date
+    : treatment?.service_date
+
+  const total = useMemo(() => {
+    if (!isGroup) return Number(treatment?.total_cost ?? 0)
+    return items.reduce((acc, it) => acc + Number(it?.total_cost ?? 0), 0)
+  }, [isGroup, items, treatment])
+
+  const borderClass = getCardBorderClass(status)
+
+  const hasOne = items.length === 1
+  const firstName = (items[0]?.service_name || '').trim()
 
   return (
     <Card
       onClick={onClick}
       className={cx(
-        'group w-full min-w-0 cursor-pointer rounded-[10px] border-2 border-transparent transition-colors transition-shadow',
-        'hover:bg-slate-50 hover:shadow-md hover:border-[#B2C6FB]',
-        'dark:hover:bg-slate-900/60 dark:hover:border-[#B2C6FB]/60 dark:hover:shadow-lg dark:hover:shadow-black/30',
+        'w-full min-w-0 cursor-pointer rounded-[14px] border-2 bg-white transition-shadow hover:shadow-md',
+        borderClass,
         className
       )}
     >
       <CardContent className="relative p-4 min-w-0">
-        <div className="flex items-start justify-between gap-2 min-w-0">
-          <div className="min-w-0 flex-1">
-            <Badge
-              variant={statusVariant}
-              className={cx(
-                'select-none font-bold cursor-pointer',
-                'ring-2 ring-inset transition-shadow',
-                ringClass,
-                'max-w-full'
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                onStatusClick?.(treatment)
-              }}
-            >
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <span className="truncate">{status}</span>
-                <Pencil className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
-              </span>
-            </Badge>
-          </div>
-
-          {showMenu ? (
+        {showMenu ? (
+          <div className="absolute right-3 top-3">
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-9 w-9"
               onClick={(e) => {
                 e.stopPropagation()
                 onMenuOpen?.(e, treatment)
@@ -91,27 +147,63 @@ export default function TreatmentCard({
             >
               <MoreVertical className="h-4 w-4" />
             </Button>
-          ) : null}
+          </div>
+        ) : null}
+
+        {/* Fecha */}
+        <div className="text-2xl font-black tracking-tight">
+          {dateValue ? formatDate(dateValue) : '—'}
         </div>
 
-        <div className="mt-3 min-w-0">
-          <p className="text-sm font-bold leading-5 break-words line-clamp-2">
-            {treatment?.service_name || '—'}
-          </p>
+        {/* ✅ Nombre(s) */}
+        <div className="mt-2 text-lg">
+          {hasOne ? (
+            <div className={cx('leading-snug break-words', firstName ? '' : 'text-muted-foreground')}>
+              {firstName || '—'}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {items.slice(0, 3).map((it, idx) => {
+                const name = (it?.service_name || '').trim()
+                return (
+                  <div
+                    key={`${name || idx}`}
+                    className={cx('leading-snug', name ? 'break-words line-clamp-2' : 'text-muted-foreground')}
+                  >
+                    {idx + 1}. {name || '—'}
+                  </div>
+                )
+              })}
+
+              {items.length > 3 ? (
+                <div className="text-base font-medium text-muted-foreground">
+                  +{items.length - 3} más
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
-        <p className="mt-2 text-sm min-w-0">
-          <span className="font-semibold">Categoría:</span>{' '}
-          <span className="text-muted-foreground break-words">
-            {treatment?.category || '—'}
-          </span>
-        </p>
+        {/* Footer */}
+        <div className="mt-8 flex items-end justify-between gap-3">
+          <div className="rounded-xl bg-slate-50 px-2 py-2">
+            <div className="text-sm text-muted-foreground">Total:</div>
+            <div className="text-xl font-extrabold">{toMoney(total)} mxn</div>
+          </div>
 
-        <div className="mt-2 flex items-center gap-2 text-sm min-w-0">
-          <span className="font-semibold shrink-0">Fecha:</span>
-          <span className="text-muted-foreground truncate">
-            {treatment?.service_date ? formatDate(treatment.service_date) : '—'}
-          </span>
+          <Badge
+            variant="outline"
+            className={cx(
+              'cursor-pointer select-none rounded-md border-2 px-1 py-1 text-sm',
+              getStatusBadgeClass(status)
+            )}
+            onClick={(e) => {
+              e.stopPropagation()
+              onStatusClick?.(treatment)
+            }}
+          >
+            {status}
+          </Badge>
         </div>
       </CardContent>
     </Card>

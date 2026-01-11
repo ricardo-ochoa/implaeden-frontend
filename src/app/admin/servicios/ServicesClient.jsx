@@ -447,10 +447,10 @@ export default function ServicesClient({ initialServices = [] }) {
         {/* Left */}
         <div>
           <p className="text-2xl font-semibold tracking-tight">Tratamientos</p>
-          <div className="mt-1 space-y-1">
+          {/* <div className="mt-1 space-y-1">
             {loading ? <p className="text-sm text-muted-foreground">Cargando servicios…</p> : null}
             {loadingCategories ? <p className="text-sm text-muted-foreground">Cargando categorías…</p> : null}
-          </div>
+          </div> */}
         </div>
 
         {/* Center search (pill) */}
@@ -490,14 +490,14 @@ export default function ServicesClient({ initialServices = [] }) {
         </div>
       </div>
 
-      {!categoriesReady ? (
+      {/* {!categoriesReady ? (
         <Alert>
           <AlertTitle>Faltan categorías</AlertTitle>
           <AlertDescription>
             No se pudieron cargar categorías. Revisa que exista <code>/api/servicios/categories</code>.
           </AlertDescription>
         </Alert>
-      ) : null}
+      ) : null} */}
 
       {/* Tabs */}
       <div className="relative">
