@@ -56,6 +56,7 @@ export default function PatientPaymentsClient({
   paciente,
   initialPayments,
   initialServicios,
+  initialTreatments = [],
 }) {
   const { id: pacienteId } = useParams()
   const router = useRouter()
@@ -100,7 +101,7 @@ export default function PatientPaymentsClient({
   const [dateFilter, setDateFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
   const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [rowsPerPage, setRowsPerPage] = useState(20)
 
   const [openCreateModal, setOpenCreateModal] = useState(false)
   const [openEditModal, setOpenEditModal] = useState(false)
@@ -123,6 +124,60 @@ export default function PatientPaymentsClient({
   const [statusOpen, setStatusOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
   const [rowsOpen, setRowsOpen] = useState(false)
+
+  const servicesWithBalance = useMemo(() => {
+  const byService = new Map()
+
+  for (const p of (localPayments || [])) {
+    const sid = p.patient_service_id
+    if (!sid) continue
+
+    const prev = byService.get(sid) || {
+      totalPagado: 0,
+      lastPaymentAt: null,
+      lastEstado: null,
+      totalCost: Number(p.total_cost || 0),
+    }
+
+    // total_pagado ya viene repetido por servicio en tus rows,
+    // así que podemos confiar en el máximo
+    const tp = Number(p.total_pagado || 0)
+    const tc = Number(p.total_cost || prev.totalCost || 0)
+    const last = p.created_at || p.fecha
+
+    byService.set(sid, {
+      totalPagado: Math.max(prev.totalPagado, tp),
+      totalCost: Math.max(prev.totalCost, tc),
+      lastPaymentAt: prev.lastPaymentAt
+        ? (new Date(last) > new Date(prev.lastPaymentAt) ? last : prev.lastPaymentAt)
+        : last,
+      lastEstado: p.estado || prev.lastEstado,
+    })
+  }
+
+  return (initialServicios || []).map((s) => {
+    const meta = byService.get(Number(s.id)) || {}
+    const totalCost = Number(s.totalCost || meta.totalCost || 0)
+    const totalPagado = Number(meta.totalPagado || 0)
+    const saldo = totalCost - totalPagado
+
+    let estadoVisual = 'pendiente'
+    if ((meta.lastEstado || '').toLowerCase() === 'cancelado') estadoVisual = 'cancelado'
+    else if ((meta.lastEstado || '').toLowerCase() === 'reembolsado') estadoVisual = 'reembolsado'
+    else if (saldo <= 0) estadoVisual = 'pagado'
+    else if (totalPagado > 0) estadoVisual = 'abono'
+
+    return {
+      ...s,
+      totalCost,
+      totalPagado,
+      saldoPendiente: saldo,
+      estadoVisual,
+      lastPaymentAt: meta.lastPaymentAt || null,
+    }
+  })
+}, [initialServicios, localPayments])
+
 
   const closeAllSelects = () => {
     setStatusOpen(false)
@@ -221,34 +276,91 @@ export default function PatientPaymentsClient({
     }
   }
 
-  // Filtrado y paginación
-  const filtered = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase()
-    return (localPayments || []).filter((p) => {
-      const tratamiento = (p.tratamiento || '').toLowerCase()
-      const factura = (p.numero_factura || '').toLowerCase()
+const treatmentIndex = useMemo(() => {
+  const byId = new Map()
+  const groupMeta = new Map()
 
-      const matchesSearch =
-        !term || tratamiento.includes(term) || factura.includes(term)
+  for (const t of initialTreatments || []) {
+    const tid = t?.treatment_id
+    if (!tid) continue
 
-      const matchesStatus =
-        statusFilter === 'all' || p.estado === statusFilter
+    const gid = t?.group_id ?? null
+    const sdate = t?.service_date ?? null
 
-      let matchesDate = true
-      if (dateFilter === 'month') {
-        const mAgo = new Date()
-        mAgo.setMonth(mAgo.getMonth() - 1)
-        matchesDate = new Date(p.fecha) >= mAgo
-      }
-      if (dateFilter === 'year') {
-        const yAgo = new Date()
-        yAgo.setFullYear(yAgo.getFullYear() - 1)
-        matchesDate = new Date(p.fecha) >= yAgo
-      }
-
-      return matchesSearch && matchesStatus && matchesDate
+    byId.set(tid, {
+      treatment_id: tid,
+      service_name: t?.service_name || null,
+      service_date: sdate,
+      group_id: gid,
+      group_title: t?.title || null,
     })
-  }, [localPayments, searchTerm, statusFilter, dateFilter])
+
+    if (gid) {
+      const prev = groupMeta.get(gid)
+      const currTime = sdate ? new Date(sdate).getTime() : Infinity
+      const prevTime = prev?.startDate ? new Date(prev.startDate).getTime() : Infinity
+
+      // startDate = la más antigua del grupo
+      if (!prev || (Number.isFinite(currTime) && currTime < prevTime)) {
+        groupMeta.set(gid, {
+          startDate: sdate,
+          title: t?.title || prev?.title || `Paquete #${gid}`,
+        })
+      } else if (!prev?.title && t?.title) {
+        groupMeta.set(gid, { ...prev, title: t.title })
+      }
+    }
+  }
+
+  return { byId, groupMeta }
+}, [initialTreatments])
+
+const filtered = useMemo(() => {
+  const term = searchTerm.trim().toLowerCase()
+
+  // 1) filtra (sin tocar el orden todavía)
+  const base = (localPayments || []).filter((p) => {
+    const tratamiento = (p.tratamiento || '').toLowerCase()
+    const factura = (p.numero_factura || '').toLowerCase()
+
+    const matchesSearch =
+      !term || tratamiento.includes(term) || factura.includes(term)
+
+    const matchesStatus =
+      statusFilter === 'all' || p.estado === statusFilter
+
+    let matchesDate = true
+    if (dateFilter === 'month') {
+      const mAgo = new Date()
+      mAgo.setMonth(mAgo.getMonth() - 1)
+      matchesDate = new Date(p.fecha) >= mAgo
+    }
+    if (dateFilter === 'year') {
+      const yAgo = new Date()
+      yAgo.setFullYear(yAgo.getFullYear() - 1)
+      matchesDate = new Date(p.fecha) >= yAgo
+    }
+
+    return matchesSearch && matchesStatus && matchesDate
+  })
+
+  // 2) ordena por group_id (desde BACK)
+  const sorted = [...base].sort((a, b) => {
+    const ga = a.group_id ?? Number.POSITIVE_INFINITY
+    const gb = b.group_id ?? Number.POSITIVE_INFINITY
+
+    // A) group_id primero (ASC). Si lo quieres DESC: return gb - ga
+    if (ga !== gb) return ga - gb
+
+    // B) dentro del mismo grupo: más reciente primero
+    const ta = new Date(a.created_at || a.fecha || 0).getTime()
+    const tb = new Date(b.created_at || b.fecha || 0).getTime()
+    return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
+  })
+
+  return sorted
+}, [localPayments, searchTerm, statusFilter, dateFilter])
+
 
   useEffect(() => {
     setPage(0)
@@ -420,9 +532,9 @@ export default function PatientPaymentsClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -490,7 +602,7 @@ export default function PatientPaymentsClient({
         open={openCreateModal}
         onClose={() => setOpenCreateModal(false)}
         initialData={null}
-        servicios={initialServicios}
+        servicios={servicesWithBalance}
         onSave={handleCreate}
       />
 

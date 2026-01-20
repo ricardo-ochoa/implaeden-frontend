@@ -446,7 +446,7 @@ export default function ServicesClient({ initialServices = [] }) {
       <div className="grid gap-4 md:grid-cols-[1fr_minmax(320px,640px)_1fr] md:items-center">
         {/* Left */}
         <div>
-          <p className="text-2xl font-semibold tracking-tight">Tratamientos</p>
+          <p className="text-2xl font-semibold tracking-tight">Servicios</p>
           {/* <div className="mt-1 space-y-1">
             {loading ? <p className="text-sm text-muted-foreground">Cargando servicios…</p> : null}
             {loadingCategories ? <p className="text-sm text-muted-foreground">Cargando categorías…</p> : null}

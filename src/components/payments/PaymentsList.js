@@ -142,14 +142,36 @@ export default function PaymentsList(props) {
   const { data = [] } = props
   const isMobile = useIsMobile(768)
 
-  const groupedPayments = useMemo(() => {
-    return (data || []).reduce((acc, pago) => {
-      const tratamiento = pago.tratamiento || 'Sin Tratamiento'
-      if (!acc[tratamiento]) acc[tratamiento] = []
-      acc[tratamiento].push(pago)
-      return acc
-    }, {})
-  }, [data])
+  const groups = useMemo(() => {
+  const map = new Map()
+
+  for (const p of data || []) {
+    const hasGroup = p.group_id != null
+
+    // 🔑 key de grupo:
+    // - si tiene group_id => g-<id>
+    // - si no => s-<patient_service_id|id> (para que quede "individual")
+    const key = hasGroup ? `g-${p.group_id}` : `s-${p.patient_service_id ?? p.id}`
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        group_id: hasGroup ? p.group_id : null,
+        title: hasGroup
+          ? (p.__groupTitle || p.group_title || `Servicios #${p.group_id}`)
+          : (p.tratamiento || 'Sin Tratamiento'),
+        // opcional: fecha del grupo para mostrar
+        start: hasGroup ? (p.group_start_date || null) : null,
+        items: [],
+      })
+    }
+
+    map.get(key).items.push(p)
+  }
+
+  return Array.from(map.values())
+}, [data])
+
 
   if (!data || data.length === 0) {
     return (
@@ -163,13 +185,20 @@ export default function PaymentsList(props) {
   if (isMobile) {
     return (
       <div>
-        {Object.entries(groupedPayments).map(([tratamiento, pagos]) => (
-          <div key={tratamiento} className="mb-6">
+        {groups.map((g) => (
+          <div key={g.key} className="mb-6">
             <div className="mb-3 pb-2 border-b">
-              <div className="font-semibold text-primary">{tratamiento}</div>
+              <div className="font-semibold text-primary">{g.title}</div>
+
+              {/* opcional: listar tratamientos dentro del paquete */}
+              {g.group_id != null ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  {Array.from(new Set(g.items.map(x => x.tratamiento).filter(Boolean))).join(' • ')}
+                </div>
+              ) : null}
             </div>
 
-            {pagos.map((p) => (
+            {g.items.map((p) => (
               <PaymentCard key={p.id} payment={p} {...props} />
             ))}
           </div>
@@ -194,19 +223,23 @@ export default function PaymentsList(props) {
         </TableHeader>
 
         <TableBody>
-          {Object.entries(groupedPayments).map(([tratamiento, pagos]) => (
-            <React.Fragment key={tratamiento}>
+          {groups.map((g) => (
+            <React.Fragment key={g.key}>
               <TableRow className="bg-muted/40">
                 <TableCell colSpan={6} className="font-semibold text-primary">
-                  {tratamiento}
+                  {g.title}
+                  {g.group_id != null ? (
+                    <span className="ml-2 text-xs text-muted-foreground font-normal">
+                      ({Array.from(new Set(g.items.map(x => x.tratamiento).filter(Boolean))).join(' • ')})
+                    </span>
+                  ) : null}
                 </TableCell>
               </TableRow>
 
-              {pagos.map((p) => {
+              {g.items.map((p) => {
                 const statusKey = props.getStatusColor(p.estado)
-
-                return (
-                  <TableRow key={p.id} className="hover:bg-muted/30">
+      return (
+        <TableRow key={p.id} className="hover:bg-muted/30">
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -263,9 +296,9 @@ export default function PaymentsList(props) {
                       </div>
                     </TableCell>
                   </TableRow>
-                )
-              })}
-            </React.Fragment>
+      )
+    })}
+  </React.Fragment>
           ))}
         </TableBody>
       </Table>

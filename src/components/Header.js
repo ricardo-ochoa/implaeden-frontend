@@ -126,7 +126,7 @@ export default function Header() {
 
               <DropdownMenuContent align="end" className="min-w-[220px]">
                 <DropdownMenuItem asChild>
-                  <Link href="/admin/servicios">Tratamientos / Servicios)</Link>
+                  <Link href="/admin/servicios">Tratamientos / Servicios</Link>
                 </DropdownMenuItem>
 
                 {/* Aquí luego metemos más secciones admin */}

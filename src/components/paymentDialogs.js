@@ -173,6 +173,9 @@ export function PaymentFormDialog({
   const [errors, setErrors] = useState({})
   const [calendarOpen, setCalendarOpen] = useState(false)
 
+  // ✅ filtro rápido: mostrar solo pendientes/abono (oculta pagados/cancelados)
+  const [onlyPending, setOnlyPending] = useState(true)
+
   // helper: Date -> YYYY-MM-DD
   const toYMD = (date) => {
     if (!date) return ''
@@ -203,7 +206,6 @@ export function PaymentFormDialog({
       setForm({
         id: initialData.id,
         fecha: initialData.fecha?.split('T')?.[0] || '',
-        // ✅ si viene lockedServiceId, forzamos ese tratamiento
         patient_service_id: fixedId || String(initialData.patient_service_id || ''),
         monto: initialData.monto ?? '',
         estado: initialData.estado || 'abono',
@@ -214,7 +216,6 @@ export function PaymentFormDialog({
       setForm({
         id: null,
         fecha: '',
-        // ✅ si viene lockedServiceId, lo seteamos desde el inicio
         patient_service_id: fixedId || '',
         monto: '',
         estado: 'abono',
@@ -231,7 +232,6 @@ export function PaymentFormDialog({
 
     if (!form.fecha) next.fecha = 'La fecha es obligatoria.'
 
-    // ✅ si NO está locked, exigir seleccionar tratamiento
     if (!lockedServiceId && !form.patient_service_id) {
       next.patient_service_id = 'El tratamiento es obligatorio.'
     }
@@ -250,7 +250,6 @@ export function PaymentFormDialog({
   const isFormValid = useMemo(() => {
     return Boolean(
       form.fecha &&
-        // ✅ si viene locked, ya cuenta como válido
         (lockedServiceId || form.patient_service_id) &&
         form.monto !== '' &&
         form.estado &&
@@ -259,15 +258,104 @@ export function PaymentFormDialog({
     )
   }, [form, lockedServiceId])
 
+  // ✅ orden + chips visuales
+  const orderedServicios = useMemo(() => {
+    const norm = (v) => (v == null ? '' : String(v))
+
+    const estadoAuto = (s) => {
+      const ev = (s?.estadoVisual || '').toLowerCase()
+      if (ev) return ev
+
+      // fallback si todavía no mandas estadoVisual desde el padre
+      const saldo = Number(s?.saldoPendiente ?? s?.saldo_pendiente ?? 0)
+      const pagado = Number(s?.totalPagado ?? s?.total_pagado ?? 0)
+      const status = (s?.estado || s?.status || '').toLowerCase()
+
+      if (status === 'cancelado') return 'cancelado'
+      if (status === 'reembolsado') return 'reembolsado'
+      if (saldo <= 0 && (pagado > 0 || Number(s?.totalCost ?? s?.total_cost ?? 0) > 0))
+        return 'pagado'
+      if (pagado > 0) return 'abono'
+      return 'pendiente'
+    }
+
+    const rank = (s) => {
+      switch (estadoAuto(s)) {
+        case 'pendiente':
+          return 1
+        case 'abono':
+          return 2
+        case 'pagado':
+          return 3
+        case 'cancelado':
+          return 4
+        case 'reembolsado':
+          return 5
+        default:
+          return 99
+      }
+    }
+
+    const sorted = [...(servicios || [])].sort((a, b) => {
+      const ra = rank(a)
+      const rb = rank(b)
+      if (ra !== rb) return ra - rb
+
+      const ta = a.lastPaymentAt ? new Date(a.lastPaymentAt).getTime() : 0
+      const tb = b.lastPaymentAt ? new Date(b.lastPaymentAt).getTime() : 0
+      if (tb !== ta) return tb - ta
+
+      return norm(a.name).localeCompare(norm(b.name), 'es')
+    })
+
+    return sorted.map((s) => {
+      const totalCost = Number(s.totalCost ?? s.total_cost ?? 0)
+      const totalPagado = Number(s.totalPagado ?? s.total_pagado ?? 0)
+      const saldoPendiente =
+        s.saldoPendiente != null
+          ? Number(s.saldoPendiente)
+          : s.saldo_pendiente != null
+          ? Number(s.saldo_pendiente)
+          : totalCost - totalPagado
+
+      const estado = estadoAuto({ ...s, totalCost, totalPagado, saldoPendiente })
+
+      return { ...s, totalCost, totalPagado, saldoPendiente, __estado: estado }
+    })
+  }, [servicios])
+
+  const visibleServicios = useMemo(() => {
+    if (lockedServiceId || hideTreatmentSelect) return orderedServicios
+    if (!onlyPending) return orderedServicios
+    return orderedServicios.filter(
+      (s) => s.__estado === 'pendiente' || s.__estado === 'abono'
+    )
+  }, [orderedServicios, onlyPending, lockedServiceId, hideTreatmentSelect])
+
   const servicioLabel = useMemo(() => {
-    // ✅ si te pasan label fijo, úsalo
     if (lockedServiceLabel) return lockedServiceLabel
 
-    const s = servicios.find(
+    const s = orderedServicios.find(
       (x) => String(x.id) === String(form.patient_service_id)
     )
     return s ? `${s.name} — ${s.totalCost}` : ''
-  }, [servicios, form.patient_service_id, lockedServiceLabel])
+  }, [orderedServicios, form.patient_service_id, lockedServiceLabel])
+
+  // helper mini para chips
+  const tagInfo = (estado) => {
+    const e = (estado || '').toLowerCase()
+    if (e === 'pagado')
+      return { text: 'PAGADO', cls: 'bg-emerald-100 text-emerald-800' }
+    if (e === 'abono')
+      return { text: 'ABONO', cls: 'bg-amber-100 text-amber-800' }
+    if (e === 'pendiente')
+      return { text: 'PENDIENTE', cls: 'bg-blue-100 text-blue-800' }
+    if (e === 'cancelado')
+      return { text: 'CANCELADO', cls: 'bg-slate-100 text-slate-800' }
+    if (e === 'reembolsado')
+      return { text: 'REEMBOLSADO', cls: 'bg-slate-100 text-slate-800' }
+    return { text: (estado || '—').toUpperCase(), cls: 'bg-slate-100 text-slate-800' }
+  }
 
   return (
     <Dialog
@@ -312,7 +400,6 @@ export function PaymentFormDialog({
                     const ymd = toYMD(d)
                     setForm((s) => ({ ...s, fecha: ymd }))
 
-                    // limpia error de fecha
                     setErrors((prev) => {
                       if (!prev.fecha) return prev
                       const copy = { ...prev }
@@ -335,9 +422,22 @@ export function PaymentFormDialog({
 
           {/* ✅ Tratamiento */}
           <div className="grid gap-2">
-            <Label>Tratamiento</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label>Tratamiento</Label>
 
-            {/* ✅ modo fijo: solo label (sin select) */}
+              {/* toggle (solo si hay select) */}
+              {!(lockedServiceId || hideTreatmentSelect) ? (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+                  onClick={() => setOnlyPending((v) => !v)}
+                  title="Mostrar/ocultar tratamientos ya pagados"
+                >
+                  {onlyPending ? 'Ver todos' : 'Solo pendientes'}
+                </button>
+              ) : null}
+            </div>
+
             {(lockedServiceId || hideTreatmentSelect) ? (
               <Input value={servicioLabel || '—'} disabled />
             ) : (
@@ -363,12 +463,44 @@ export function PaymentFormDialog({
                   >
                     <SelectValue placeholder="Selecciona tratamiento" />
                   </SelectTrigger>
+
                   <SelectContent>
-                    {servicios.map((s) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {s.name} — {s.totalCost}
-                      </SelectItem>
-                    ))}
+                    {visibleServicios.map((s) => {
+                      const saldo = Number(s.saldoPendiente ?? 0)
+                      const total = Number(s.totalCost ?? 0)
+                      const pagado = Number(s.totalPagado ?? 0)
+                      const { text, cls } = tagInfo(s.__estado)
+
+                      // opcional: bloquear cancelado/reembolsado
+                      const disabled =
+                        s.__estado === 'cancelado' || s.__estado === 'reembolsado'
+
+                      return (
+                        <SelectItem
+                          key={s.id}
+                          value={String(s.id)}
+                          disabled={disabled}
+                        >
+                          <div className="flex items-center justify-between gap-3 w-full">
+                            <div className="min-w-0">
+                              <div className="truncate text-left">{s.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Total: {total} · Pagado: {pagado} · Saldo a pagar: {saldo}
+                              </div>
+                            </div>
+
+                            <span
+                              className={cx(
+                                'text-[10px] px-2 py-0.5 rounded-full font-semibold',
+                                cls
+                              )}
+                            >
+                              {text}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
 
@@ -477,9 +609,7 @@ export function PaymentFormDialog({
                 <SelectItem value="Efectivo">Efectivo</SelectItem>
                 <SelectItem value="tarjeta_credito">Tarjeta de crédito</SelectItem>
                 <SelectItem value="tarjeta_debito">Tarjeta de débito</SelectItem>
-                <SelectItem value="transferencia">
-                  Transferencia bancaria
-                </SelectItem>
+                <SelectItem value="transferencia">Transferencia bancaria</SelectItem>
               </SelectContent>
             </Select>
             {errors.metodo_pago ? (
@@ -527,10 +657,11 @@ export function PaymentFormDialog({
               const ok = validate()
               if (!ok) return
 
-              // ✅ aseguramos que se guarde con el tratamiento fijo si aplica
               const payload = {
                 ...form,
-                patient_service_id: String(lockedServiceId || form.patient_service_id),
+                patient_service_id: String(
+                  lockedServiceId || form.patient_service_id
+                ),
               }
 
               await onSave?.(payload)
