@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -187,21 +187,21 @@ export default function TreatmentPaymentsModal({
               <Badge variant="outlined">
                 Costo total: {toMoney(totals.totalCost)}
               </Badge>
-              <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200">
+              <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-transparent">
                 Pagado: {toMoney(totals.paid)}
               </Badge>
               <Badge
                 className={cx(
                   'border',
+                  'hover:bg-transparent',
                   totals.remaining > 0
-                    ? 'bg-amber-100 text-amber-950 border-amber-200'
-                    : 'bg-blue-100 text-blue-900 border-blue-200'
+                    ? 'bg-amber-100 text-amber-950 border-amber-200 hover:bg-transparent'
+                    : 'bg-blue-100 text-blue-900 border-blue-200 hover:bg-transparent'
                 )}
               >
                 Restante total: {toMoney(totals.remaining)}
               </Badge>
             </div>
-
             <Separator />
 
             {loading ? (
@@ -255,18 +255,18 @@ export default function TreatmentPaymentsModal({
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            <Badge variant="outlined">
+                            <Badge variant="outlined hover:bg-transparent">
                               Costo: {toMoney(cost)}
                             </Badge>
-                            <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200">
+                            <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-transparent">
                               Pagado: {toMoney(paid)}
                             </Badge>
                             <Badge
                               className={cx(
                                 'border',
                                 remaining > 0
-                                  ? 'bg-amber-100 text-amber-950 border-amber-200'
-                                  : 'bg-blue-100 text-blue-900 border-blue-200'
+                                  ? 'bg-amber-100 text-amber-950 border-amber-200 hover:bg-transparent'
+                                  : 'bg-blue-100 text-blue-900 border-blue-200 hover:bg-transparent'
                               )}
                             >
                               Restante: {toMoney(remaining)}
@@ -285,55 +285,43 @@ export default function TreatmentPaymentsModal({
                             <table className="w-full text-sm">
                               <thead className="text-muted-foreground">
                                 <tr className="border-b">
-                                  <th className="py-2 text-left font-medium">
-                                    Fecha
-                                  </th>
-                                  <th className="py-2 text-left font-medium">
-                                    Método
-                                  </th>
-                                  <th className="py-2 text-left font-medium">
-                                    Factura
-                                  </th>
-                                  <th className="py-2 text-right font-medium">
-                                    Monto
-                                  </th>
+                                  <th className="py-2 text-left font-medium">Fecha</th>
+                                  <th className="py-2 text-left font-medium">Método</th>
+                                  <th className="py-2 text-left font-medium">Factura</th>
+                                  <th className="py-2 text-right font-medium">Monto</th>
                                 </tr>
                               </thead>
+
                               <tbody>
-                                {list.map((p) => (
-                                  <tr key={p.id} className="border-b">
-                                    <td className="py-2">{toDate(p.fecha)}</td>
-                                    <td className="py-2">
-                                      {p.metodo_pago || '—'}
-                                    </td>
-                                    <td className="py-2">
-                                      {p.numero_factura || '—'}
-                                    </td>
-                                    <td className="py-2 text-right">
-                                      {toMoney(p.monto)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {list.map((p, idx) => {
+                                  const isLast = idx === list.length - 1
+
+                                  return (
+                                    <React.Fragment key={p.id}>
+                                      {/* Row principal */}
+                                      <tr>
+                                        <td className="py-2">{toDate(p.fecha)}</td>
+                                        <td className="py-2">{p.metodo_pago || '—'}</td>
+                                        <td className="py-2">{p.numero_factura || '—'}</td>
+                                        <td className="py-2 text-right">{toMoney(p.monto)}</td>
+                                      </tr>
+
+                                      {/* Row de nota debajo */}
+                                      {p.notas ? (
+                                        <tr className={isLast ? '' : 'border-b'}>
+                                          <td colSpan={4} className="pb-3">
+                                            <div className="text-xs text-muted-foreground">
+                                              <span className="font-medium text-foreground/80">Nota:</span>{' '}
+                                              <span className="whitespace-pre-wrap">{p.notas}</span>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ) : null}
+                                    </React.Fragment>
+                                  )
+                                })}
                               </tbody>
                             </table>
-
-                            {list.some((p) => p.notas) ? (
-                              <div className="mt-3 space-y-2">
-                                {list
-                                  .filter((p) => p.notas)
-                                  .map((p) => (
-                                    <div
-                                      key={`note-${p.id}`}
-                                      className="text-xs text-muted-foreground"
-                                    >
-                                      <span className="font-medium text-foreground/80">
-                                        Nota:
-                                      </span>{' '}
-                                      {p.notas}
-                                    </div>
-                                  ))}
-                              </div>
-                            ) : null}
                           </div>
                         )}
 

@@ -243,7 +243,7 @@ export default function TratamientosClient({ paciente }) {
 
   const handleStatusClick = (treatment) => {
     setSelectedTreatment(treatment)
-    setNewStatus(normalizeStatus(treatment?.status)) // ✅ siempre "Por Iniciar"|"En proceso"|"Terminado"
+    setNewStatus(normalizeStatus(treatment?.status))
     setStatusModalOpen(true)
   }
 
@@ -251,7 +251,6 @@ export default function TratamientosClient({ paciente }) {
     if (!selectedTreatment || !newStatus) return
 
     try {
-      // ✅ si es grupo => actualiza TODOS los tratamientos del grupo
       if (selectedTreatment?.isGroup) {
         const ids = (selectedTreatment.items || [])
           .map((x) => x?.treatment_id)
@@ -278,7 +277,6 @@ export default function TratamientosClient({ paciente }) {
         return
       }
 
-      // ✅ single
       if (!selectedTreatment?.treatment_id) return
 
       await api.put(
@@ -311,14 +309,12 @@ export default function TratamientosClient({ paciente }) {
     if (!recordToDelete) return
 
     try {
-      // ✅ si es grupo => borra TODOS
       if (recordToDelete?.isGroup) {
         const ids = (recordToDelete.items || [])
           .map((x) => x?.treatment_id)
           .filter(Boolean)
 
         for (const id of ids) {
-          // eslint-disable-next-line no-await-in-loop
           await deleteTreatment(id)
         }
 
@@ -335,7 +331,6 @@ export default function TratamientosClient({ paciente }) {
         return
       }
 
-      // ✅ single
       if (!recordToDelete?.treatment_id) return
       await deleteTreatment(recordToDelete.treatment_id)
 
@@ -380,7 +375,6 @@ export default function TratamientosClient({ paciente }) {
         </Button>
       </div>
 
-      {/* Grid de cards (1 por grupo o 1 por tratamiento suelto) */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {cards.map((card) => {
           const key = card.isGroup ? `group-${card.group_id}` : `t-${card.treatment_id}`
@@ -444,7 +438,6 @@ export default function TratamientosClient({ paciente }) {
         })}
       </div>
 
-      {/* Modales */}
       <ModalServicio
         open={isModalOpen}
         onClose={handleCloseModal}
@@ -494,7 +487,6 @@ export default function TratamientosClient({ paciente }) {
         card={paymentsTarget}
       />
 
-      {/* Toast tipo snackbar */}
       {toast.open ? (
         <div className="fixed bottom-6 left-1/2 z-50 w-[92vw] max-w-[520px] -translate-x-1/2">
           <Alert variant={toast.variant === 'error' ? 'destructive' : 'default'}>
