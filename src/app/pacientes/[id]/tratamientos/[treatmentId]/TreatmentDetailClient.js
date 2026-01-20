@@ -1,38 +1,34 @@
-// src/app/pacientes/[id]/tratamientos/[treatmentId]/TreatmentDetailClient.js
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 // shadcn/ui
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/ui/alert'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Separator } from '@/components/ui/separator'
 
-// icons (lucide)
+// icons
 import {
   Check,
   FileText,
   Loader2,
   Mail,
   Pencil,
+  ReceiptText,
   Trash2,
   X,
+  NotebookPen,
+  History,
 } from 'lucide-react'
 
 import UploadFilesModal from '@/components/UploadFilesModal'
 import FilePreviewModal from '@/components/FilePreviewModal'
 import TreatmentDetailEvidences from '@/components/TreatmentDetailEvidences'
+import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
+import TreatmentHistoryDrawer from '@/components/TreatmentHistoryDrawer'
 
 import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocuments'
 import useEmailDocuments from '../../../../../../lib/hooks/useEmailDocuments'
@@ -46,24 +42,29 @@ const DOCUMENT_TYPES = [
   { type: 'end_letter', label: 'Carta fin' },
 ]
 
-export default function TreatmentDetailClient({
-  paciente,
-  tratamiento: initialTratamiento,
-}) {
+const toDate = (v) => {
+  if (!v) return '—'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return String(v)
+  return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' })
+}
+
+const toMoney = (n) => {
+  try {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(n || 0))
+  } catch {
+    return `${n || 0}`
+  }
+}
+
+// ✅ detalle para 1 tratamiento
+function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
   const [tratamiento, setTratamiento] = useState(initialTratamiento)
 
-  // Costo editable
   const [isEditingCost, setIsEditingCost] = useState(false)
-  const [editableCost, setEditableCost] = useState(
-    initialTratamiento?.total_cost ?? 0
-  )
-  const [costAlert, setCostAlert] = useState({
-    open: false,
-    message: '',
-    severity: 'success', // 'success' | 'error'
-  })
+  const [editableCost, setEditableCost] = useState(initialTratamiento?.total_cost ?? 0)
 
-  // Documentos (hook)
+  // ✅ Documentos (hook) — aquí faltaba destructurar varias cosas
   const {
     documents = [],
     loading,
@@ -73,11 +74,10 @@ export default function TreatmentDetailClient({
     createDocument,
     deleteDocument,
     updateCost,
-  } = useTreatmentDocuments(paciente.id, tratamiento?.treatment_id)
+  } = useTreatmentDocuments(paciente.id, tratamiento?.treatment_id ?? tratamiento?.id)
 
   // Email (hook)
-  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } =
-    useEmailDocuments()
+  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } = useEmailDocuments()
 
   // UI subida docs
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -86,16 +86,21 @@ export default function TreatmentDetailClient({
   const [newFiles, setNewFiles] = useState([])
   const [previewFile, setPreviewFile] = useState(null)
 
+  // sincroniza state interno si cambia initialTratamiento (ej: padre actualiza total_cost)
+  useEffect(() => {
+    setTratamiento(initialTratamiento)
+    setEditableCost(initialTratamiento?.total_cost ?? 0)
+  }, [initialTratamiento])
+
   const selectedDocLabel = useMemo(() => {
     return DOCUMENT_TYPES.find((d) => d.type === selectedDocType)?.label || ''
   }, [selectedDocType])
 
   const money = useMemo(() => {
     try {
-      return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-      }).format(Number(tratamiento?.total_cost ?? 0))
+      return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
+        Number(tratamiento?.total_cost ?? 0)
+      )
     } catch {
       return `${tratamiento?.total_cost ?? 0}`
     }
@@ -135,31 +140,32 @@ export default function TreatmentDetailClient({
     await fetchDocuments()
   }
 
+  // ✅ ÚNICO handleUpdateCost (el tuyo estaba duplicado)
   const handleUpdateCost = async () => {
-    const success = await updateCost(editableCost)
+    const newCost = Number(editableCost)
+    if (!Number.isFinite(newCost)) {
+      window.alert('Costo inválido')
+      return
+    }
+
+    const success = await updateCost(newCost) // ✅ debe pegarle a PUT /:treatmentId/costo (o el que uses)
 
     if (success) {
-      setTratamiento((prev) => ({
-        ...prev,
-        total_cost: parseFloat(editableCost),
-      }))
+      const tid = tratamiento?.treatment_id ?? tratamiento?.id
+
+      // actualiza state local
+      setTratamiento((prev) => ({ ...prev, total_cost: newCost }))
       setIsEditingCost(false)
-      setCostAlert({
-        open: true,
-        message: 'Costo actualizado exitosamente.',
-        severity: 'success',
-      })
+
+      // ✅ notifica al padre para actualizar Total + refrescar drawer
+      onCostSaved?.(tid, newCost)
     } else {
-      setCostAlert({
-        open: true,
-        message: error || 'Ocurrió un error.',
-        severity: 'error',
-      })
+      window.alert(error || 'Ocurrió un error.')
     }
   }
 
   const renderDocCard = ({ type, label }) => {
-    const docs = documents.filter((d) => d.document_type === type)
+    const docs = (documents || []).filter((d) => d.document_type === type)
     const isEmailLoading = Boolean(loadingLabels?.has?.(label))
 
     return (
@@ -175,9 +181,7 @@ export default function TreatmentDetailClient({
           <div className="flex items-center justify-between gap-2">
             <p className="font-semibold">{label}</p>
             {docs.length > 0 ? (
-              <p className="text-xs text-muted-foreground">
-                {formatDate(docs[0].created_at)}
-              </p>
+              <p className="text-xs text-muted-foreground">{formatDate(docs[0].created_at)}</p>
             ) : null}
           </div>
 
@@ -209,11 +213,7 @@ export default function TreatmentDetailClient({
                         />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={doc.file_url}
-                          alt={label}
-                          className="h-full w-full object-cover"
-                        />
+                        <img src={doc.file_url} alt={label} className="h-full w-full object-cover" />
                       )}
                     </div>
 
@@ -283,7 +283,7 @@ export default function TreatmentDetailClient({
 
   return (
     <div className="space-y-4">
-      {/* Costo */}
+      {/* 1) Costo */}
       <div className="flex flex-wrap items-center gap-3">
         <p className="font-semibold">Costo del tratamiento:</p>
 
@@ -305,18 +305,17 @@ export default function TreatmentDetailClient({
               aria-label="Guardar costo"
               title="Guardar"
             >
-              {isUpdating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             </Button>
 
             <Button
               type="button"
               variant="outline"
               size="icon"
-              onClick={() => setIsEditingCost(false)}
+              onClick={() => {
+                setEditableCost(tratamiento?.total_cost ?? 0)
+                setIsEditingCost(false)
+              }}
               disabled={isUpdating}
               aria-label="Cancelar"
               title="Cancelar"
@@ -326,10 +325,7 @@ export default function TreatmentDetailClient({
           </div>
         ) : (
           <div
-            className={cx(
-              'group flex items-center gap-2 rounded-md px-2 py-1',
-              'hover:bg-muted/40 cursor-pointer'
-            )}
+            className={cx('group flex items-center gap-2 rounded-md px-2 py-1', 'hover:bg-muted/40 cursor-pointer')}
             onClick={() => setIsEditingCost(true)}
             role="button"
             tabIndex={0}
@@ -353,7 +349,7 @@ export default function TreatmentDetailClient({
         )}
       </div>
 
-      {/* Carga / error */}
+      {/* loading/error docs */}
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando documentos…
@@ -367,15 +363,13 @@ export default function TreatmentDetailClient({
         </Alert>
       ) : null}
 
-      {/* Documentos */}
+      {/* 2) Documentos */}
       <Accordion type="single" collapsible defaultValue="docs">
         <AccordionItem value="docs" className="border rounded-md">
           <AccordionTrigger className="px-4 py-3 hover:no-underline">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              <span className="font-semibold">
-                Documentos ({documents.length})
-              </span>
+              <span className="font-semibold">Documentos ({documents.length})</span>
             </div>
           </AccordionTrigger>
 
@@ -387,13 +381,10 @@ export default function TreatmentDetailClient({
         </AccordionItem>
       </Accordion>
 
-      {/* evidencias adicionales */}
-      <TreatmentDetailEvidences
-        patientId={paciente.id}
-        treatmentId={tratamiento?.treatment_id}
-      />
+      {/* 3) Evidencias */}
+      <TreatmentDetailEvidences patientId={paciente.id} treatmentId={tratamiento?.treatment_id ?? tratamiento?.id} />
 
-      {/* Modales (si luego quieres, migramos estos a shadcn Dialog también) */}
+      {/* Modales */}
       <UploadFilesModal
         open={isModalOpen}
         onClose={handleCloseModal}
@@ -404,19 +395,13 @@ export default function TreatmentDetailClient({
         handleSaveRecord={handleSaveDocument}
       />
 
-      <FilePreviewModal
-        open={Boolean(previewFile)}
-        onClose={() => setPreviewFile(null)}
-        file={previewFile}
-      />
+      <FilePreviewModal open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} file={previewFile} />
 
-      {/* Alerts flotantes (reemplazo de Snackbar) */}
+      {/* Alerts flotantes */}
       {emailAlert?.open ? (
         <div className="fixed bottom-6 right-6 z-50 w-[320px]">
           <Alert variant={emailAlert.severity === 'error' ? 'destructive' : 'default'}>
-            <AlertTitle>
-              {emailAlert.severity === 'error' ? 'Error' : 'Listo'}
-            </AlertTitle>
+            <AlertTitle>{emailAlert.severity === 'error' ? 'Error' : 'Listo'}</AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-3">
               <span>{emailAlert.message}</span>
               <Button variant="ghost" size="icon" onClick={closeAlert} aria-label="Cerrar">
@@ -426,27 +411,176 @@ export default function TreatmentDetailClient({
           </Alert>
         </div>
       ) : null}
+    </div>
+  )
+}
 
-      {costAlert.open ? (
-        <div className="fixed bottom-24 right-6 z-50 w-[320px]">
-          <Alert variant={costAlert.severity === 'error' ? 'destructive' : 'default'}>
-            <AlertTitle>
-              {costAlert.severity === 'error' ? 'Error' : 'Listo'}
-            </AlertTitle>
-            <AlertDescription className="flex items-center justify-between gap-3">
-              <span>{costAlert.message}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCostAlert((p) => ({ ...p, open: false }))}
-                aria-label="Cerrar"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </AlertDescription>
-          </Alert>
+export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [paymentsOpen, setPaymentsOpen] = useState(false)
+
+  const [treatmentsState, setTreatmentsState] = useState(() =>
+    Array.isArray(tratamientos) ? tratamientos : []
+  )
+
+  useEffect(() => {
+    setTreatmentsState(Array.isArray(tratamientos) ? tratamientos : [])
+  }, [tratamientos])
+
+  const many = treatmentsState.length > 1
+  const one = treatmentsState[0]
+
+  const totalCost = useMemo(() => {
+    return treatmentsState.reduce((acc, t) => acc + Number(t?.total_cost || 0), 0)
+  }, [treatmentsState])
+
+  // ✅ para refrescar drawer cuando cambie costo afuera
+  const [eventsRefreshKey, setEventsRefreshKey] = useState(0)
+  const bumpEvents = () => setEventsRefreshKey((x) => x + 1)
+
+  const onCostSaved = (treatmentId, newCost) => {
+    setTreatmentsState((prev) =>
+      prev.map((t) => {
+        const tid = t?.treatment_id ?? t?.id
+        if (Number(tid) !== Number(treatmentId)) return t
+        return { ...t, total_cost: Number(newCost) }
+      })
+    )
+    bumpEvents()
+  }
+
+  const card = useMemo(() => {
+  if (!many) {
+    return one
+      ? {
+          isGroup: false,
+          treatment_id: one?.treatment_id ?? one?.id,
+          service_name: one?.service_name,
+          service_date: one?.service_date,
+          total_cost: one?.total_cost,
+          group_id: one?.group_id ?? null,
+        }
+      : null
+  }
+
+  return {
+  isGroup: true,
+  title: 'Paquete de tratamientos',
+  group_id:
+    Number(treatmentsState?.[0]?.group_id) ||
+    Number(treatmentsState?.[0]?.groupId) ||
+    null,
+  items: treatmentsState,
+}
+
+}, [many, one, treatmentsState])
+
+
+  const TotalAndHistoryButtons = (
+    <div className="mt-6 flex items-center gap-2">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setPaymentsOpen(true)}
+        className={cx(
+          'flex items-center gap-2 rounded-xl bg-muted px-3 py-2',
+          'cursor-pointer select-none',
+          'transition hover:bg-muted/80 active:scale-[0.99]'
+        )}
+        title="Ver pagos"
+      >
+        <div className="text-base">Total:</div>
+        <ReceiptText className="h-5 w-5" />
+        <div className="text-lg font-mono font-semibold">{toMoney(totalCost)}</div>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={() => setHistoryOpen(true)}
+        title="Bitácora"
+        className="rounded-xl"
+      >
+        <History />
+      </Button>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      {!many ? (
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Tratamiento</p>
+            <p className="font-semibold">{one?.service_name || 'Tratamiento'}</p>
+          </div>
+          {TotalAndHistoryButtons}
         </div>
-      ) : null}
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">Paquete de tratamientos</p>
+            <p className="font-semibold">Incluye {treatmentsState.length} tratamientos</p>
+          </div>
+          {TotalAndHistoryButtons}
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Body */}
+      {!many ? (
+        <TreatmentDetailItem
+          paciente={paciente}
+          initialTratamiento={one}
+          onCostSaved={onCostSaved}
+        />
+      ) : (
+        <Accordion type="multiple" className="space-y-2">
+          {treatmentsState.map((t) => {
+            const tid = t?.treatment_id ?? t?.id
+            const label = t?.service_name || 'Tratamiento'
+            const date = toDate(t?.service_date)
+
+            return (
+              <AccordionItem key={String(tid)} value={String(tid)} className="border rounded-md px-2">
+                <AccordionTrigger className="px-2 hover:no-underline">
+                  <div className="flex flex-col items-start text-left">
+                    <span className="font-semibold">{label}</span>
+                    <span className="text-xs text-muted-foreground">Fecha: {date}</span>
+                  </div>
+                </AccordionTrigger>
+
+                <AccordionContent className="px-2 pb-4">
+                  <TreatmentDetailItem
+                    paciente={paciente}
+                    initialTratamiento={t}
+                    onCostSaved={onCostSaved}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            )
+          })}
+        </Accordion>
+      )}
+
+      {/* ✅ Modales */}
+      <TreatmentPaymentsModal
+        open={paymentsOpen}
+        onOpenChange={setPaymentsOpen}
+        patientId={paciente?.id}
+        card={card}
+      />
+
+      <TreatmentHistoryDrawer
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        patientId={paciente?.id}
+        card={card}
+        refreshKey={eventsRefreshKey}
+      />
     </div>
   )
 }

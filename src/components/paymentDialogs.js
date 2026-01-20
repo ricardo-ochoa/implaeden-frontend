@@ -155,6 +155,9 @@ export function PaymentFormDialog({
   initialData,
   servicios = [],
   onSave,
+  lockedServiceId,
+  lockedServiceLabel,
+  hideTreatmentSelect = false,
 }) {
   const [form, setForm] = useState({
     id: initialData?.id || null,
@@ -194,11 +197,14 @@ export function PaymentFormDialog({
     if (!open) return
     setErrors({})
 
+    const fixedId = lockedServiceId ? String(lockedServiceId) : ''
+
     if (initialData) {
       setForm({
         id: initialData.id,
         fecha: initialData.fecha?.split('T')?.[0] || '',
-        patient_service_id: initialData.patient_service_id || '',
+        // ✅ si viene lockedServiceId, forzamos ese tratamiento
+        patient_service_id: fixedId || String(initialData.patient_service_id || ''),
         monto: initialData.monto ?? '',
         estado: initialData.estado || 'abono',
         metodo_pago: initialData.metodo_pago || '',
@@ -208,22 +214,31 @@ export function PaymentFormDialog({
       setForm({
         id: null,
         fecha: '',
-        patient_service_id: '',
+        // ✅ si viene lockedServiceId, lo seteamos desde el inicio
+        patient_service_id: fixedId || '',
         monto: '',
         estado: 'abono',
         metodo_pago: '',
         notas: '',
       })
     }
+
     setCalendarOpen(false)
-  }, [initialData, open])
+  }, [initialData, open, lockedServiceId])
 
   const validate = () => {
     const next = {}
 
     if (!form.fecha) next.fecha = 'La fecha es obligatoria.'
-    if (!form.patient_service_id) next.patient_service_id = 'El tratamiento es obligatorio.'
-    if (form.monto === '' || Number(form.monto) <= 0) next.monto = 'El monto debe ser mayor a 0.'
+
+    // ✅ si NO está locked, exigir seleccionar tratamiento
+    if (!lockedServiceId && !form.patient_service_id) {
+      next.patient_service_id = 'El tratamiento es obligatorio.'
+    }
+
+    if (form.monto === '' || Number(form.monto) <= 0) {
+      next.monto = 'El monto debe ser mayor a 0.'
+    }
     if (!form.estado) next.estado = 'El estatus es obligatorio.'
     if (!form.metodo_pago) next.metodo_pago = 'El método de pago es obligatorio.'
     if (!form.notas) next.notas = 'Las notas son obligatorias.'
@@ -235,18 +250,24 @@ export function PaymentFormDialog({
   const isFormValid = useMemo(() => {
     return Boolean(
       form.fecha &&
-        form.patient_service_id &&
+        // ✅ si viene locked, ya cuenta como válido
+        (lockedServiceId || form.patient_service_id) &&
         form.monto !== '' &&
         form.estado &&
         form.metodo_pago &&
         form.notas
     )
-  }, [form])
+  }, [form, lockedServiceId])
 
   const servicioLabel = useMemo(() => {
-    const s = servicios.find((x) => String(x.id) === String(form.patient_service_id))
+    // ✅ si te pasan label fijo, úsalo
+    if (lockedServiceLabel) return lockedServiceLabel
+
+    const s = servicios.find(
+      (x) => String(x.id) === String(form.patient_service_id)
+    )
     return s ? `${s.name} — ${s.totalCost}` : ''
-  }, [servicios, form.patient_service_id])
+  }, [servicios, form.patient_service_id, lockedServiceLabel])
 
   return (
     <Dialog
@@ -275,7 +296,8 @@ export function PaymentFormDialog({
                   className={cx(
                     'w-full justify-start text-left font-normal',
                     !form.fecha && 'text-muted-foreground',
-                    errors.fecha && 'border-destructive focus-visible:ring-destructive'
+                    errors.fecha &&
+                      'border-destructive focus-visible:ring-destructive'
                   )}
                 >
                   {form.fecha ? form.fecha : 'Selecciona una fecha'}
@@ -289,6 +311,7 @@ export function PaymentFormDialog({
                   onSelect={(d) => {
                     const ymd = toYMD(d)
                     setForm((s) => ({ ...s, fecha: ymd }))
+
                     // limpia error de fecha
                     setErrors((prev) => {
                       if (!prev.fecha) return prev
@@ -296,7 +319,7 @@ export function PaymentFormDialog({
                       delete copy.fecha
                       return copy
                     })
-                    // cierra popover
+
                     setCalendarOpen(false)
                   }}
                   className="rounded-md border shadow-sm"
@@ -310,40 +333,58 @@ export function PaymentFormDialog({
             ) : null}
           </div>
 
-          {/* Tratamiento */}
+          {/* ✅ Tratamiento */}
           <div className="grid gap-2">
             <Label>Tratamiento</Label>
-            <Select
-              value={String(form.patient_service_id || '')}
-              onValueChange={(v) => {
-                setForm((s) => ({ ...s, patient_service_id: v }))
-                setErrors((prev) => {
-                  if (!prev.patient_service_id) return prev
-                  const copy = { ...prev }
-                  delete copy.patient_service_id
-                  return copy
-                })
-              }}
-            >
-              <SelectTrigger
-                className={errors.patient_service_id ? 'border-destructive focus:ring-destructive' : ''}
-              >
-                <SelectValue placeholder="Selecciona tratamiento" />
-              </SelectTrigger>
-              <SelectContent>
-                {servicios.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.name} — {s.totalCost}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {servicioLabel ? (
-              <div className="text-xs text-muted-foreground">{servicioLabel}</div>
-            ) : null}
-            {errors.patient_service_id ? (
-              <p className="text-xs text-destructive">{errors.patient_service_id}</p>
-            ) : null}
+
+            {/* ✅ modo fijo: solo label (sin select) */}
+            {(lockedServiceId || hideTreatmentSelect) ? (
+              <Input value={servicioLabel || '—'} disabled />
+            ) : (
+              <>
+                <Select
+                  value={String(form.patient_service_id || '')}
+                  onValueChange={(v) => {
+                    setForm((s) => ({ ...s, patient_service_id: v }))
+                    setErrors((prev) => {
+                      if (!prev.patient_service_id) return prev
+                      const copy = { ...prev }
+                      delete copy.patient_service_id
+                      return copy
+                    })
+                  }}
+                >
+                  <SelectTrigger
+                    className={
+                      errors.patient_service_id
+                        ? 'border-destructive focus:ring-destructive'
+                        : ''
+                    }
+                  >
+                    <SelectValue placeholder="Selecciona tratamiento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {servicios.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.name} — {s.totalCost}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {servicioLabel ? (
+                  <div className="text-xs text-muted-foreground">
+                    {servicioLabel}
+                  </div>
+                ) : null}
+
+                {errors.patient_service_id ? (
+                  <p className="text-xs text-destructive">
+                    {errors.patient_service_id}
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
 
           {/* Monto */}
@@ -361,9 +402,15 @@ export function PaymentFormDialog({
                   return copy
                 })
               }}
-              className={errors.monto ? 'border-destructive focus-visible:ring-destructive' : ''}
+              className={
+                errors.monto
+                  ? 'border-destructive focus-visible:ring-destructive'
+                  : ''
+              }
             />
-            {errors.monto ? <p className="text-xs text-destructive">{errors.monto}</p> : null}
+            {errors.monto ? (
+              <p className="text-xs text-destructive">{errors.monto}</p>
+            ) : null}
           </div>
 
           {/* Estatus */}
@@ -381,7 +428,13 @@ export function PaymentFormDialog({
                 })
               }}
             >
-              <SelectTrigger className={errors.estado ? 'border-destructive focus:ring-destructive' : ''}>
+              <SelectTrigger
+                className={
+                  errors.estado
+                    ? 'border-destructive focus:ring-destructive'
+                    : ''
+                }
+              >
                 <SelectValue placeholder="Selecciona estatus" />
               </SelectTrigger>
               <SelectContent>
@@ -391,7 +444,9 @@ export function PaymentFormDialog({
                 <SelectItem value="reembolsado">Reembolsado</SelectItem>
               </SelectContent>
             </Select>
-            {errors.estado ? <p className="text-xs text-destructive">{errors.estado}</p> : null}
+            {errors.estado ? (
+              <p className="text-xs text-destructive">{errors.estado}</p>
+            ) : null}
           </div>
 
           {/* Método */}
@@ -409,17 +464,27 @@ export function PaymentFormDialog({
                 })
               }}
             >
-              <SelectTrigger className={errors.metodo_pago ? 'border-destructive focus:ring-destructive' : ''}>
+              <SelectTrigger
+                className={
+                  errors.metodo_pago
+                    ? 'border-destructive focus:ring-destructive'
+                    : ''
+                }
+              >
                 <SelectValue placeholder="Selecciona método" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Efectivo">Efectivo</SelectItem>
                 <SelectItem value="tarjeta_credito">Tarjeta de crédito</SelectItem>
                 <SelectItem value="tarjeta_debito">Tarjeta de débito</SelectItem>
-                <SelectItem value="transferencia">Transferencia bancaria</SelectItem>
+                <SelectItem value="transferencia">
+                  Transferencia bancaria
+                </SelectItem>
               </SelectContent>
             </Select>
-            {errors.metodo_pago ? <p className="text-xs text-destructive">{errors.metodo_pago}</p> : null}
+            {errors.metodo_pago ? (
+              <p className="text-xs text-destructive">{errors.metodo_pago}</p>
+            ) : null}
           </div>
 
           {/* Notas */}
@@ -437,10 +502,16 @@ export function PaymentFormDialog({
                   return copy
                 })
               }}
-              className={errors.notas ? 'border-destructive focus-visible:ring-destructive' : ''}
+              className={
+                errors.notas
+                  ? 'border-destructive focus-visible:ring-destructive'
+                  : ''
+              }
               placeholder="Notas…"
             />
-            {errors.notas ? <p className="text-xs text-destructive">{errors.notas}</p> : null}
+            {errors.notas ? (
+              <p className="text-xs text-destructive">{errors.notas}</p>
+            ) : null}
           </div>
         </div>
 
@@ -455,7 +526,14 @@ export function PaymentFormDialog({
             onClick={async () => {
               const ok = validate()
               if (!ok) return
-              await onSave?.(form)
+
+              // ✅ aseguramos que se guarde con el tratamiento fijo si aplica
+              const payload = {
+                ...form,
+                patient_service_id: String(lockedServiceId || form.patient_service_id),
+              }
+
+              await onSave?.(payload)
               onClose?.()
             }}
           >
@@ -466,6 +544,7 @@ export function PaymentFormDialog({
     </Dialog>
   )
 }
+
 
 /** =========================
  *  ConfirmDeleteDialog

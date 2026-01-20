@@ -22,6 +22,7 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import ModalServicio from '@/components/ModalServicio'
 import TreatmentCard from '@/components/TreatmentCard'
 import UpdateStatusModal from '@/components/UpdateStatusModal'
+import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
 
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments'
 import api from '../../../../../lib/api'
@@ -133,6 +134,15 @@ export default function TratamientosClient({ paciente }) {
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [selectedTreatment, setSelectedTreatment] = useState(null)
   const [newStatus, setNewStatus] = useState('')
+
+    // pagos modal
+      const [paymentsModalOpen, setPaymentsModalOpen] = useState(false)
+      const [paymentsTarget, setPaymentsTarget] = useState(null)
+  
+      const openPayments = (card) => {
+        setPaymentsTarget(card)
+        setPaymentsModalOpen(true)
+      }
 
   // toast
   const [toast, setToast] = useState({
@@ -400,18 +410,15 @@ export default function TratamientosClient({ paciente }) {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() => {
-                        setToast({
-                          open: true,
-                          variant: 'success',
-                          title: 'Pendiente',
-                          message: 'El detalle de pagos se desarrollará después.',
-                        })
-                      }}
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Ver pagos
-                    </DropdownMenuItem>
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          openPayments(card)
+                        }}
+                      >
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Ver pagos
+                      </DropdownMenuItem>
 
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
@@ -475,6 +482,16 @@ export default function TratamientosClient({ paciente }) {
         newStatus={newStatus}
         setNewStatus={setNewStatus}
         onSave={handleSaveStatus}
+      />
+
+      <TreatmentPaymentsModal
+        open={paymentsModalOpen}
+        onOpenChange={(v) => {
+          setPaymentsModalOpen(v)
+          if (!v) setPaymentsTarget(null)
+        }}
+        patientId={paciente.id}
+        card={paymentsTarget}
       />
 
       {/* Toast tipo snackbar */}

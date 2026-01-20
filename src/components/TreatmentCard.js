@@ -162,7 +162,7 @@ const isGroup =
               {firstName || '—'}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div>
               {items.slice(0, 3).map((it, idx) => {
                 const name = (it?.service_name || '').trim()
                 return (
