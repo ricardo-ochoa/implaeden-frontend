@@ -57,7 +57,7 @@ const getStatusBadgeClass = (status) => {
   }
 }
 
-export default function TreatmentCard({
+export default function TreatmentCardOld({
   treatment,
   onMenuOpen,
   onClick,
