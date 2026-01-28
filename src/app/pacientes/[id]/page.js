@@ -3,9 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import SectionTitle from "@/components/SectionTitle";
-import BasicInfoCard from "@/components/BasicInfoCard";
-import GeneralCard from "@/components/GeneralCard";
 import SmartSummaryAssistant from "@/components/SmartSummaryAssistant";
+import PatientDetailClient from "./PatientDetailClient";
 
 export default async function PatientDetailPage({ params }) {
   const { id } = params;
@@ -16,9 +15,7 @@ export default async function PatientDetailPage({ params }) {
 
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
     cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (res.status === 401) redirect("/login");
@@ -27,12 +24,7 @@ export default async function PatientDetailPage({ params }) {
   const patient = await res.json();
   const fullName = `${patient?.nombre || ""} ${patient?.apellidos || ""}`.trim();
 
-  const cards = [
-    {
-      title: "Historial clínico",
-      description: "Documento con la información médico del paciente.",
-      redirect: `/pacientes/${id}/historial`,
-    },
+  const menuCards = [
     {
       title: "Tratamientos",
       description: "Información y documentos de cada tratamiento.",
@@ -44,6 +36,11 @@ export default async function PatientDetailPage({ params }) {
       redirect: `/pacientes/${id}/pagos`,
     },
     {
+      title: "Historial clínico",
+      description: "Documento con la información médica del paciente.",
+      redirect: `/pacientes/${id}/historial`,
+    },
+    {
       title: "Citas",
       description: "Fecha e información de cada cita del paciente.",
       redirect: `/pacientes/${id}/citas`,
@@ -51,7 +48,7 @@ export default async function PatientDetailPage({ params }) {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="px-8 py-4">
       <SectionTitle
         title={fullName}
         breadcrumbs={[
@@ -60,24 +57,11 @@ export default async function PatientDetailPage({ params }) {
         ]}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Left: Basic info */}
-        <div className="space-y-4">
-          <BasicInfoCard patient={patient} />
-        </div>
-
-        {/* Right: Action cards */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {cards.map((card) => (
-            <GeneralCard
-              key={card.redirect}
-              title={card.title}
-              description={card.description}
-              redirect={card.redirect}
-            />
-          ))}
-        </div>
-      </div>
+      <PatientDetailClient
+        patient={patient}
+        patientId={Number(id)}
+        menuCards={menuCards}
+      />
 
       <div className="mt-6">
         <SmartSummaryAssistant patientId={Number(id)} />

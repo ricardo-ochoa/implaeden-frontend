@@ -101,7 +101,7 @@ export default function PatientCards({ patients = [] }) {
               </div>
 
               {/* email */}
-              <div
+              {/* <div
                 className="mb-3 flex items-center gap-2 font-semibold transition-transform hover:scale-[1.02]"
                 onClick={(e) => handleCopyToClipboard(e, patient.email)}
                 role="button"
@@ -112,10 +112,10 @@ export default function PatientCards({ patients = [] }) {
                 <span className="min-w-0 truncate text-sm">
                   {patient.email || "N/A"}
                 </span>
-              </div>
+              </div> */}
 
               <div className="flex flex-col gap-2">
-                <Button
+                {/* <Button
                   size="sm"
                   variant="secondary"
                   className="w-full font-bold"
@@ -123,7 +123,7 @@ export default function PatientCards({ patients = [] }) {
                 >
                   <CalendarDays className="w-4" />
                   Ver Citas
-                </Button>
+                </Button> */}
 
                 <SmartSummaryAssistant patientId={Number(patient.id)} variant="inline">
                   <Button

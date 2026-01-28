@@ -28,20 +28,31 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 export default function PatientHistoryClient({
-  patient,
+  patient, patientId,
   clinicalRecords: initialHistoryData,
 }) {
   const defaultAvatar = useRandomAvatar()
-  const patientId = patient.id
-  const patientName = `${patient.nombre} ${patient.apellidos}`.trim()
-  const avatarUrl = patient.foto_perfil_url || defaultAvatar
+  const pid = Number(
+  patientId ?? patient?.id ?? patient?.patient_id ?? patient?.paciente_id
+)
+const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim() || 'Paciente'
+const avatarUrl = patient?.foto_perfil_url || defaultAvatar
+
+if (!pid) {
+  return (
+    <Alert variant="destructive">
+      <AlertTitle>Error</AlertTitle>
+      <AlertDescription>Falta patientId/patient.id para cargar historial clínico.</AlertDescription>
+    </Alert>
+  )
+}
 
   const {
     data: clinicalRecords,
     error,
     isLoading,
     mutate,
-  } = useSWR(`/clinical-histories/${patientId}`, fetcher, {
+  } = useSWR(pid ? `/clinical-histories/${pid}` : null, fetcher, {
     fallbackData: initialHistoryData,
   })
 
@@ -95,7 +106,7 @@ export default function PatientHistoryClient({
 
     setIsSaving(true)
     try {
-      await api.post(`/clinical-histories/${patientId}`, form)
+      await api.post(`/clinical-histories/${pid}`, form)
       await mutate()
       setModalOpen(false)
       setNewDate('')

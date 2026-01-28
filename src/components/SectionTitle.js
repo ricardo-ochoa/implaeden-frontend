@@ -57,9 +57,9 @@ export default function SectionTitle({ breadcrumbs = [], title, isHome }) {
       </nav>
 
       {/* Título */}
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+      {/* <h1 className="mt-2 text-3xl font-semibold tracking-tight">
         {title}
-      </h1>
+      </h1> */}
     </div>
   )
 }

@@ -26,7 +26,7 @@ export default function StartDatePicker({ value, onChange }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button type="button" className="bg-muted pl-1 hover:bg-gray-200 justify-start ">
+        <Button type="button" className="bg-white pl-1 hover:bg-gray-200 justify-start">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <CalendarIcon className="h-5 w-5" />
           </span>

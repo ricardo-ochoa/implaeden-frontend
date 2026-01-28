@@ -61,9 +61,7 @@ export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
   };
 
   return (
-    <Box mt={4}>
-      <Divider sx={{ my: 4 }} />
-
+    <Box mt={1}>
       <Box
         sx={{
           display: 'flex',
@@ -85,11 +83,8 @@ export default function TreatmentDetailEvidences({ patientId, treatmentId }) {
           }}
         >
             <ImageIcon className="mr-1" />
-          <Typography variant="h6" fontWeight="bold">
-            Evidencias
-          </Typography>
           <Chip
-            label={evidences.length}
+            label={`${evidences.length} evidencia${evidences.length !== 1 ? 's' : ''}`}
             color="primary"
             size="small"
             sx={{ fontWeight: 'bold', mr:4 }}

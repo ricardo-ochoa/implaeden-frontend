@@ -7,7 +7,12 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { Separator } from '@/components/ui/separator'
 
 // icons
@@ -46,25 +51,45 @@ const toDate = (v) => {
   if (!v) return '—'
   const d = new Date(v)
   if (Number.isNaN(d.getTime())) return String(v)
-  return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' })
+  return d.toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  })
 }
 
 const toMoney = (n) => {
   try {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(n || 0))
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(Number(n || 0))
   } catch {
     return `${n || 0}`
   }
 }
 
 // ✅ detalle para 1 tratamiento
-function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
+function TreatmentDetailItem({
+  paciente,
+  initialTratamiento,
+  onCostSaved,
+  onQuantitySaved,
+}) {
   const [tratamiento, setTratamiento] = useState(initialTratamiento)
 
   const [isEditingCost, setIsEditingCost] = useState(false)
-  const [editableCost, setEditableCost] = useState(initialTratamiento?.total_cost ?? 0)
+  const [editableCost, setEditableCost] = useState(
+    initialTratamiento?.total_cost ?? 0
+  )
 
-  // ✅ Documentos (hook) — aquí faltaba destructurar varias cosas
+  // ✅ NUEVO: cantidad
+  const [isEditingQty, setIsEditingQty] = useState(false)
+  const [editableQty, setEditableQty] = useState(
+    initialTratamiento?.quantity ?? 1
+  )
+
+  // ✅ Documentos (hook)
   const {
     documents = [],
     loading,
@@ -74,10 +99,12 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
     createDocument,
     deleteDocument,
     updateCost,
+    updateQuantity, // ✅ nuevo
   } = useTreatmentDocuments(paciente.id, tratamiento?.treatment_id ?? tratamiento?.id)
 
   // Email (hook)
-  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } = useEmailDocuments()
+  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } =
+    useEmailDocuments()
 
   // UI subida docs
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -86,10 +113,11 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
   const [newFiles, setNewFiles] = useState([])
   const [previewFile, setPreviewFile] = useState(null)
 
-  // sincroniza state interno si cambia initialTratamiento (ej: padre actualiza total_cost)
+  // sincroniza state interno si cambia initialTratamiento
   useEffect(() => {
     setTratamiento(initialTratamiento)
     setEditableCost(initialTratamiento?.total_cost ?? 0)
+    setEditableQty(initialTratamiento?.quantity ?? 1) // ✅ nuevo
   }, [initialTratamiento])
 
   const selectedDocLabel = useMemo(() => {
@@ -98,9 +126,10 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
 
   const money = useMemo(() => {
     try {
-      return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
-        Number(tratamiento?.total_cost ?? 0)
-      )
+      return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+      }).format(Number(tratamiento?.total_cost ?? 0))
     } catch {
       return `${tratamiento?.total_cost ?? 0}`
     }
@@ -140,7 +169,7 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
     await fetchDocuments()
   }
 
-  // ✅ ÚNICO handleUpdateCost (el tuyo estaba duplicado)
+  // ✅ ÚNICO handleUpdateCost
   const handleUpdateCost = async () => {
     const newCost = Number(editableCost)
     if (!Number.isFinite(newCost)) {
@@ -148,17 +177,39 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
       return
     }
 
-    const success = await updateCost(newCost) // ✅ debe pegarle a PUT /:treatmentId/costo (o el que uses)
+    const success = await updateCost(newCost)
 
     if (success) {
       const tid = tratamiento?.treatment_id ?? tratamiento?.id
 
-      // actualiza state local
       setTratamiento((prev) => ({ ...prev, total_cost: newCost }))
       setIsEditingCost(false)
 
-      // ✅ notifica al padre para actualizar Total + refrescar drawer
       onCostSaved?.(tid, newCost)
+    } else {
+      window.alert(error || 'Ocurrió un error.')
+    }
+  }
+
+  // ✅ NUEVO: handleUpdateQuantity
+  const handleUpdateQuantity = async () => {
+    const q = Number(editableQty)
+    const qty = Number.isFinite(q) ? Math.trunc(q) : NaN
+
+    if (!Number.isFinite(qty) || qty < 1) {
+      window.alert('Cantidad inválida (entero >= 1)')
+      return
+    }
+
+    const success = await updateQuantity(qty)
+
+    if (success) {
+      const tid = tratamiento?.treatment_id ?? tratamiento?.id
+
+      setTratamiento((prev) => ({ ...prev, quantity: qty }))
+      setIsEditingQty(false)
+
+      onQuantitySaved?.(tid, qty)
     } else {
       window.alert(error || 'Ocurrió un error.')
     }
@@ -181,7 +232,9 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
           <div className="flex items-center justify-between gap-2">
             <p className="font-semibold">{label}</p>
             {docs.length > 0 ? (
-              <p className="text-xs text-muted-foreground">{formatDate(docs[0].created_at)}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDate(docs[0].created_at)}
+              </p>
             ) : null}
           </div>
 
@@ -213,7 +266,11 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
                         />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={doc.file_url} alt={label} className="h-full w-full object-cover" />
+                        <img
+                          src={doc.file_url}
+                          alt={label}
+                          className="h-full w-full object-cover"
+                        />
                       )}
                     </div>
 
@@ -283,70 +340,155 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
 
   return (
     <div className="space-y-4">
-      {/* 1) Costo */}
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="font-semibold">Costo del tratamiento:</p>
+      {/* 1) Costo + Cantidad */}
+      <div className="flex flex-wrap items-center gap-8">
+        {/* Costo */}
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="font-semibold">Costo del tratamiento:</p>
 
-        {isEditingCost ? (
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              value={editableCost}
-              onChange={(e) => setEditableCost(e.target.value)}
-              disabled={isUpdating}
-              className="w-[140px]"
-            />
+          {isEditingCost ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={editableCost}
+                onChange={(e) => setEditableCost(e.target.value)}
+                disabled={isUpdating}
+                className="w-[140px]"
+              />
 
-            <Button
-              type="button"
-              size="icon"
-              onClick={handleUpdateCost}
-              disabled={isUpdating}
-              aria-label="Guardar costo"
-              title="Guardar"
-            >
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            </Button>
+              <Button
+                type="button"
+                size="icon"
+                onClick={handleUpdateCost}
+                disabled={isUpdating}
+                aria-label="Guardar costo"
+                title="Guardar"
+              >
+                {isUpdating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+              </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setEditableCost(tratamiento?.total_cost ?? 0)
-                setIsEditingCost(false)
-              }}
-              disabled={isUpdating}
-              aria-label="Cancelar"
-              title="Cancelar"
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setEditableCost(tratamiento?.total_cost ?? 0)
+                  setIsEditingCost(false)
+                }}
+                disabled={isUpdating}
+                aria-label="Cancelar"
+                title="Cancelar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div
+              className={cx(
+                'group flex items-center gap-2 rounded-md px-2 py-1',
+                'hover:bg-muted/40 cursor-pointer'
+              )}
+              onClick={() => setIsEditingCost(true)}
+              role="button"
+              tabIndex={0}
             >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <div
-            className={cx('group flex items-center gap-2 rounded-md px-2 py-1', 'hover:bg-muted/40 cursor-pointer')}
-            onClick={() => setIsEditingCost(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <p className="text-lg font-semibold">{money}</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-              aria-label="Editar costo"
-              title="Editar"
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsEditingCost(true)
-              }}
+              <p className="text-lg font-semibold">{money}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Editar costo"
+                title="Editar"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditingCost(true)
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Cantidad */}
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="font-semibold">Cantidad:</p>
+
+          {isEditingQty ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={editableQty}
+                onChange={(e) => setEditableQty(e.target.value)}
+                disabled={isUpdating}
+                className="w-[110px]"
+              />
+
+              <Button
+                type="button"
+                size="icon"
+                onClick={handleUpdateQuantity}
+                disabled={isUpdating}
+                aria-label="Guardar cantidad"
+                title="Guardar"
+              >
+                {isUpdating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setEditableQty(tratamiento?.quantity ?? 1)
+                  setIsEditingQty(false)
+                }}
+                disabled={isUpdating}
+                aria-label="Cancelar"
+                title="Cancelar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div
+              className={cx(
+                'group flex items-center gap-2 rounded-md px-2 py-1',
+                'hover:bg-muted/40 cursor-pointer'
+              )}
+              onClick={() => setIsEditingQty(true)}
+              role="button"
+              tabIndex={0}
             >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+              <p className="text-lg font-semibold">{tratamiento?.quantity ?? 1}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                aria-label="Editar cantidad"
+                title="Editar"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditingQty(true)
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* loading/error docs */}
@@ -364,12 +506,14 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
       ) : null}
 
       {/* 2) Documentos */}
-      <Accordion type="single" collapsible defaultValue="docs">
+      <Accordion type="single" collapsible>
         <AccordionItem value="docs" className="border rounded-md">
           <AccordionTrigger className="px-4 py-3 hover:no-underline">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              <span className="font-semibold">Documentos ({documents.length})</span>
+              <span className="font-semibold">
+                Documentos ({documents.length})
+              </span>
             </div>
           </AccordionTrigger>
 
@@ -382,7 +526,24 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
       </Accordion>
 
       {/* 3) Evidencias */}
-      <TreatmentDetailEvidences patientId={paciente.id} treatmentId={tratamiento?.treatment_id ?? tratamiento?.id} />
+      <Accordion type="single" collapsible>
+        <AccordionItem value="evidences" className="border rounded-md">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <NotebookPen className="h-4 w-4" />
+              <span className="font-semibold">Evidencias</span>
+            </div>
+          </AccordionTrigger>
+
+          <AccordionContent className="px-4 pb-4">
+            <TreatmentDetailEvidences
+              patientId={paciente.id}
+              treatmentId={tratamiento?.treatment_id ?? tratamiento?.id}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
 
       {/* Modales */}
       <UploadFilesModal
@@ -395,16 +556,29 @@ function TreatmentDetailItem({ paciente, initialTratamiento, onCostSaved }) {
         handleSaveRecord={handleSaveDocument}
       />
 
-      <FilePreviewModal open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} file={previewFile} />
+      <FilePreviewModal
+        open={Boolean(previewFile)}
+        onClose={() => setPreviewFile(null)}
+        file={previewFile}
+      />
 
       {/* Alerts flotantes */}
       {emailAlert?.open ? (
         <div className="fixed bottom-6 right-6 z-50 w-[320px]">
-          <Alert variant={emailAlert.severity === 'error' ? 'destructive' : 'default'}>
-            <AlertTitle>{emailAlert.severity === 'error' ? 'Error' : 'Listo'}</AlertTitle>
+          <Alert
+            variant={emailAlert.severity === 'error' ? 'destructive' : 'default'}
+          >
+            <AlertTitle>
+              {emailAlert.severity === 'error' ? 'Error' : 'Listo'}
+            </AlertTitle>
             <AlertDescription className="flex items-center justify-between gap-3">
               <span>{emailAlert.message}</span>
-              <Button variant="ghost" size="icon" onClick={closeAlert} aria-label="Cerrar">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={closeAlert}
+                aria-label="Cerrar"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </AlertDescription>
@@ -434,7 +608,7 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
     return treatmentsState.reduce((acc, t) => acc + Number(t?.total_cost || 0), 0)
   }, [treatmentsState])
 
-  // ✅ para refrescar drawer cuando cambie costo afuera
+  // ✅ para refrescar drawer cuando cambie algo afuera
   const [eventsRefreshKey, setEventsRefreshKey] = useState(0)
   const bumpEvents = () => setEventsRefreshKey((x) => x + 1)
 
@@ -449,32 +623,42 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
     bumpEvents()
   }
 
-  const card = useMemo(() => {
-  if (!many) {
-    return one
-      ? {
-          isGroup: false,
-          treatment_id: one?.treatment_id ?? one?.id,
-          service_name: one?.service_name,
-          service_date: one?.service_date,
-          total_cost: one?.total_cost,
-          group_id: one?.group_id ?? null,
-        }
-      : null
+  // ✅ NUEVO: para mantener cantidad sincronizada en el padre
+  const onQuantitySaved = (treatmentId, newQty) => {
+    setTreatmentsState((prev) =>
+      prev.map((t) => {
+        const tid = t?.treatment_id ?? t?.id
+        if (Number(tid) !== Number(treatmentId)) return t
+        return { ...t, quantity: Number(newQty) }
+      })
+    )
+    bumpEvents()
   }
 
-  return {
-  isGroup: true,
-  title: 'Paquete de tratamientos',
-  group_id:
-    Number(treatmentsState?.[0]?.group_id) ||
-    Number(treatmentsState?.[0]?.groupId) ||
-    null,
-  items: treatmentsState,
-}
+  const card = useMemo(() => {
+    if (!many) {
+      return one
+        ? {
+            isGroup: false,
+            treatment_id: one?.treatment_id ?? one?.id,
+            service_name: one?.service_name,
+            service_date: one?.service_date,
+            total_cost: one?.total_cost,
+            group_id: one?.group_id ?? null,
+          }
+        : null
+    }
 
-}, [many, one, treatmentsState])
-
+    return {
+      isGroup: true,
+      title: 'Paquete de tratamientos',
+      group_id:
+        Number(treatmentsState?.[0]?.group_id) ||
+        Number(treatmentsState?.[0]?.groupId) ||
+        null,
+      items: treatmentsState,
+    }
+  }, [many, one, treatmentsState])
 
   const TotalAndHistoryButtons = (
     <div className="mt-6 flex items-center gap-2">
@@ -499,7 +683,7 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
         variant="outline"
         size="icon"
         onClick={() => setHistoryOpen(true)}
-        title="Bitácora"
+        title="Historial"
         className="rounded-xl"
       >
         <History />
@@ -536,6 +720,7 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
           paciente={paciente}
           initialTratamiento={one}
           onCostSaved={onCostSaved}
+          onQuantitySaved={onQuantitySaved}
         />
       ) : (
         <Accordion type="multiple" className="space-y-2">
@@ -545,11 +730,17 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
             const date = toDate(t?.service_date)
 
             return (
-              <AccordionItem key={String(tid)} value={String(tid)} className="border rounded-md px-2">
+              <AccordionItem
+                key={String(tid)}
+                value={String(tid)}
+                className="border rounded-md px-2"
+              >
                 <AccordionTrigger className="px-2 hover:no-underline">
                   <div className="flex flex-col items-start text-left">
                     <span className="font-semibold">{label}</span>
-                    <span className="text-xs text-muted-foreground">Fecha: {date}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Fecha: {date}
+                    </span>
                   </div>
                 </AccordionTrigger>
 
@@ -558,6 +749,7 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
                     paciente={paciente}
                     initialTratamiento={t}
                     onCostSaved={onCostSaved}
+                    onQuantitySaved={onQuantitySaved}
                   />
                 </AccordionContent>
               </AccordionItem>

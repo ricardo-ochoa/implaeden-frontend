@@ -74,20 +74,27 @@ const formatMoneyDisplay = (raw) => {
   }).format(n)
 }
 
+/** ✅ qty robusto: entero >= 0 (vacío = N/A) */
+const parseQty = (val) => {
+  if (val === null || val === undefined) return 0
+  const s = String(val).trim()
+  if (!s) return 0
+  if (!/^\d+$/.test(s)) return NaN
+  const n = Number(s)
+  return Number.isFinite(n) ? n : NaN
+}
+
 /** ✅ normaliza lo que venga del picker a ids numéricos */
 const normalizeIdsFromPicker = (value) => {
   const arr = Array.isArray(value) ? value : []
   const ids = arr
     .map((x) => {
-      // si viene objeto servicio
       if (x && typeof x === 'object') return getServiceId(x)
-      // si viene id (string/number)
       const n = Number(x)
       return Number.isFinite(n) ? n : null
     })
     .filter((n) => n != null)
 
-  // quita duplicados
   return Array.from(new Set(ids))
 }
 
@@ -108,6 +115,7 @@ export default function ModalServicio({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selectedServiceIds, setSelectedServiceIds] = useState([]) // number[]
   const [costById, setCostById] = useState({}) // { [serviceId]: string }
+  const [qtyById, setQtyById] = useState({}) // { [serviceId]: string }  ✅ NUEVO
   const [groupTitle, setGroupTitle] = useState('')
   const [focusedCostId, setFocusedCostId] = useState(null)
 
@@ -145,6 +153,7 @@ export default function ModalServicio({
     })
   }, [open, isGroup, selectedServices])
 
+  /** ✅ total = suma de "total_cost" (no lo multiplicamos por cantidad porque es costo total del tratamiento) */
   const total = useMemo(() => {
     return (selectedServiceIds || []).reduce((acc, id) => {
       const sid = Number(id)
@@ -157,7 +166,15 @@ export default function ModalServicio({
   const handleRemoveService = (id) => {
     const sid = Number(id)
     setSelectedServiceIds((prev) => prev.filter((x) => Number(x) !== sid))
+
     setCostById((prev) => {
+      const next = { ...prev }
+      delete next[sid]
+      delete next[String(sid)]
+      return next
+    })
+
+    setQtyById((prev) => {
       const next = { ...prev }
       delete next[sid]
       delete next[String(sid)]
@@ -189,9 +206,34 @@ export default function ModalServicio({
     handleChangeCost(sidNum, n.toFixed(2))
   }
 
-  // inicializa costos vacíos para ids seleccionados
+  const handleChangeQty = (id, value) => {
+    const sidNum = Number(id)
+    // permitimos borrar para que el usuario edite, pero validamos al guardar
+    setQtyById((prev) => ({ ...prev, [sidNum]: value, [String(sidNum)]: value }))
+  }
+
+  const handleBlurQty = (sid) => {
+  const sidNum = Number(sid)
+  const raw = qtyById[sidNum] ?? qtyById[String(sidNum)] ?? ''
+  const n = parseQty(raw)
+  // vacío = N/A → lo dejamos vacío
+  if (n === null) {
+    handleChangeQty(sidNum, '')
+    return
+  }
+  // inválido o negativo → lo limpiamos
+  if (!Number.isFinite(n) || n < 0) {
+    handleChangeQty(sidNum, '')
+    return
+  }
+  // normaliza
+  handleChangeQty(sidNum, String(n))
+}
+
+  // inicializa costos/cantidades para ids seleccionados
   useEffect(() => {
     if (!open) return
+
     setCostById((prev) => {
       const next = { ...prev }
       for (const id of selectedServiceIds) {
@@ -202,7 +244,23 @@ export default function ModalServicio({
           next[kStr] = ''
         }
       }
-      // limpia los que ya no están
+      for (const key of Object.keys(next)) {
+        const kNum = Number(key)
+        if (!selectedServiceIds.some((x) => Number(x) === kNum)) delete next[key]
+      }
+      return next
+    })
+
+    setQtyById((prev) => {
+      const next = { ...prev }
+      for (const id of selectedServiceIds) {
+        const kNum = Number(id)
+        const kStr = String(kNum)
+        if (next[kNum] === undefined && next[kStr] === undefined) {
+          next[kNum] = ''
+          next[kStr] = ''
+        }
+      }
       for (const key of Object.keys(next)) {
         const kNum = Number(key)
         if (!selectedServiceIds.some((x) => Number(x) === kNum)) delete next[key]
@@ -222,6 +280,11 @@ export default function ModalServicio({
         [sid]: initialCost ?? '',
         [String(sid)]: initialCost ?? '',
       }))
+      setQtyById((prev) => ({
+        ...prev,
+        [sid]: prev?.[sid] ?? '1',
+        [String(sid)]: prev?.[String(sid)] ?? '1',
+      }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -239,11 +302,22 @@ export default function ModalServicio({
 
     for (const id of selectedServiceIds) {
       const sid = Number(id)
-      const raw = costById[sid] ?? costById[String(sid)]
-      if (raw === '' || raw === null || raw === undefined) return true
-      const num = parseMoney(raw)
+
+      // costo
+      const rawCost = costById[sid] ?? costById[String(sid)]
+      if (rawCost === '' || rawCost === null || rawCost === undefined) return true
+      const num = parseMoney(rawCost)
       if (!Number.isFinite(num) || num < 0) return true
+
+      // cantidad ✅
+      const rawQty = qtyById[sid] ?? qtyById[String(sid)] ?? ''
+      const q = parseQty(rawQty)
+      // vacío (null) = N/A -> OK
+      if (q !== null) {
+        if (!Number.isFinite(q) || q < 0) return true
+      }
     }
+
     return false
   }, [
     newRecordDate,
@@ -251,6 +325,7 @@ export default function ModalServicio({
     selectedServices,
     services,
     costById,
+    qtyById,
     isGroup,
     groupTitle,
   ])
@@ -260,18 +335,23 @@ export default function ModalServicio({
 
     const items = selectedServiceIds.map((id) => {
       const sid = Number(id)
-      const raw = costById[sid] ?? costById[String(sid)]
-      return {
+      const rawCost = costById[sid] ?? costById[String(sid)]
+      const rawQty = qtyById[sid] ?? qtyById[String(sid)] ?? ''
+      const q = parseQty(rawQty) // null = vacío/N/A
+      const item = {
         service_id: sid,
-        total_cost: parseMoney(raw),
+        total_cost: parseMoney(rawCost),
       }
+      // si el usuario escribió algo (incluye "0"), lo mandamos
+      if (q !== null) item.quantity = q
+      return item
     })
 
     if (items.length > 1) {
       await handleSaveRecord?.({
         title: String(groupTitle || '').trim(),
         start_date: newRecordDate,
-        items,
+        items, // items ahora traen quantity
       })
       return
     }
@@ -280,6 +360,7 @@ export default function ModalServicio({
       service_id: items[0].service_id,
       service_date: newRecordDate,
       total_cost: items[0].total_cost,
+      quantity: items[0].quantity, // ✅ NUEVO
     })
   }
 
@@ -291,7 +372,7 @@ export default function ModalServicio({
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => !v && onClose?.()}>
-        <DialogContent className="sm:max-w-[760px]">
+        <DialogContent className="w-[calc(100vw-24px)] max-w-[760px] sm:w-full max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -309,38 +390,41 @@ export default function ModalServicio({
                 onChange={(e) => setGroupTitle(e.target.value)}
                 placeholder="Ej: Implantes + Endodoncia + Profilaxis"
               />
-              <p className="text-xs text-muted-foreground">El nombre es requerido para guardar.</p>
+              <p className="text-xs text-muted-foreground">
+                El nombre es requerido para guardar.
+              </p>
             </div>
           ) : null}
 
           <div className="border-t pt-5">
             <div className="flex items-center justify-between">
               <div className="text-base font-semibold">Tratamientos seleccionados</div>
-              <div className="text-sm font-semibold">$ Costo</div>
+              <div className="hidden sm:flex items-center gap-3">
+                <div className="text-sm font-semibold w-[90px] text-right">Cant.</div>
+                <div className="text-sm font-semibold w-[160px] text-right">$ Costo</div>
+              </div>
             </div>
 
             <div className="mt-4 space-y-3">
               {selectedServices.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Aún no agregas tratamientos.</div>
+                <div className="text-sm text-muted-foreground">
+                  Aún no agregas tratamientos.
+                </div>
               ) : (
                 selectedServices.map((svc, idx) => {
                   const sid = getServiceId(svc)
                   if (sid == null) return null
 
-                  const raw = costById[sid] ?? costById[String(sid)] ?? ''
+                  const rawCost = costById[sid] ?? costById[String(sid)] ?? ''
+                  const rawQty = qtyById[sid] ?? qtyById[String(sid)] ?? ''
                   const isFocused = focusedCostId === sid
 
                   return (
-                    <div key={sid} className="flex items-center justify-between gap-3">
+                    <div
+                        key={sid}
+                        className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center bg-background text-xs font-semibold">
-                          {idx + 1}
-                        </span>
-
-                        <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium truncate max-w-[320px]">
-                          {svc.name}
-                        </span>
-
                         <button
                           type="button"
                           onClick={() => handleRemoveService(sid)}
@@ -349,19 +433,42 @@ export default function ModalServicio({
                         >
                           <X className="h-4 w-4" />
                         </button>
+                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center bg-background text-xs font-semibold">
+                          {idx + 1}
+                        </span>
+
+                        <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium truncate max-w-[220px] sm:max-w-[320px]">
+                          {svc.name}
+                        </span>
+
                       </div>
 
-                      <div className="w-[160px]">
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className="text-right font-mono font-medium rounded-full bg-muted text-foreground"
-                          value={isFocused ? raw : formatMoneyDisplay(raw)}
-                          onFocus={() => setFocusedCostId(sid)}
-                          onBlur={() => handleBlurCost(sid)}
-                          onChange={(e) => handleChangeCost(sid, e.target.value)}
-                        />
+                      {/* ✅ inputs derecha */}
+                      <div className="grid grid-cols-2 gap-3 w-full sm:w-auto sm:flex sm:items-center sm:gap-3">
+                        <div className="w-full sm:w-[90px]">
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="N/A"
+                            className="text-right font-mono font-medium rounded-full bg-muted text-foreground"
+                            value={rawQty}
+                            onChange={(e) => handleChangeQty(sid, e.target.value)}
+                            onBlur={() => handleBlurQty(sid)}
+                          />
+                        </div>
+
+                        <div className="w-full sm:w-[160px]">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            className="text-right font-mono font-medium rounded-full bg-muted text-foreground"
+                            value={isFocused ? rawCost : formatMoneyDisplay(rawCost)}
+                            onFocus={() => setFocusedCostId(sid)}
+                            onBlur={() => handleBlurCost(sid)}
+                            onChange={(e) => handleChangeCost(sid, e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
                   )
@@ -381,7 +488,11 @@ export default function ModalServicio({
                 Agregar nuevo
               </Button>
 
-              {error ? <div className="mt-2 text-xs text-destructive">Error cargando servicios.</div> : null}
+              {error ? (
+                <div className="mt-2 text-xs text-destructive">
+                  Error cargando servicios.
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-6 flex items-center justify-between border-t pt-4">

@@ -27,10 +27,22 @@ const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 export default function CitasClient({
   paciente,
+  patientId,
   initialServicios = [],
   initialCitas = [],
 }) {
-  const pacienteId = paciente.id
+  const pid = Number(
+    patientId ?? paciente?.id ?? paciente?.patient_id ?? paciente?.paciente_id
+  )
+
+  if (!pid) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>Falta patientId/paciente.id para cargar citas.</AlertDescription>
+      </Alert>
+    )
+  }
 
   // SWR
   const {
@@ -38,7 +50,7 @@ export default function CitasClient({
     error: errorCitas,
     isLoading: loadingCitas,
     mutate,
-  } = useSWR(`/pacientes/${pacienteId}/citas`, fetcher, {
+  } = useSWR(pid ? `/pacientes/${pid}/citas` : null, fetcher, {
     fallbackData: initialCitas,
   })
 
@@ -83,8 +95,8 @@ export default function CitasClient({
 
     try {
       const promise = selectedCita
-        ? api.put(`/pacientes/${pacienteId}/citas/${selectedCita.id}`, form)
-        : api.post(`/pacientes/${pacienteId}/citas`, form)
+        ? api.put(`/pacientes/${pid}/citas/${selectedCita.id}`, form)
+      : api.post(`/pacientes/${pid}/citas`, form)
 
       await promise
       await mutate()

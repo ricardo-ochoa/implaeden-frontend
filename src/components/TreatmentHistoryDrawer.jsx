@@ -178,8 +178,8 @@ export default function TreatmentHistoryDrawer({
   const [note, setNote] = useState('')
 
   const title = isGroupContext
-    ? `Bitácora del paquete: ${card?.title || 'Tratamientos'}`
-    : `Bitácora del tratamiento: ${card?.service_name || 'Tratamiento'}`
+    ? `Historial de los tratamientos: ${card?.title || 'Tratamientos'}`
+    : `Historial del tratamiento: ${card?.service_name || 'Tratamiento'}`
 
   // ✅ FILTRO CORRECTO:
   // - si hay groupId: muestra
@@ -267,7 +267,7 @@ export default function TreatmentHistoryDrawer({
                   onChange={(e) => setTarget(e.target.value)}
                   disabled={saving}
                 >
-                  <option value="">Paquete (general)</option>
+                  <option value="">Anotación general</option>
                   {treatmentsInfo.map((t) => (
                     <option key={t.patient_service_id} value={t.patient_service_id}>
                       {t.service_name} (ID: {t.patient_service_id})

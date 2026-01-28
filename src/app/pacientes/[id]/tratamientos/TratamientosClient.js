@@ -15,17 +15,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 // icons
-import { MoreVertical, Plus, Trash2, Pencil, CreditCard } from 'lucide-react'
+import { MoreVertical, Plus, Trash2, Pencil, CreditCard, Search, X } from 'lucide-react'
 
 // tus componentes
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 import ModalServicio from '@/components/ModalServicio'
-import TreatmentCard from '@/components/TreatmentCard'
+import TreatmentCard from '@/components/tratamientos/TreatmentCard'
 import UpdateStatusModal from '@/components/UpdateStatusModal'
 import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
-
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments'
 import api from '../../../../../lib/api'
+import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
+import { Input } from '@/components/ui/input'
+
 
 // ✅ Normaliza SIEMPRE a: ["Por Iniciar","En proceso","Terminado"]
 const normalizeStatus = (raw) => {
@@ -134,6 +136,9 @@ export default function TratamientosClient({ paciente }) {
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [selectedTreatment, setSelectedTreatment] = useState(null)
   const [newStatus, setNewStatus] = useState('')
+  const [selectedTeeth, setSelectedTeeth] = useState([])
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [search, setSearch] = useState('')
 
     // pagos modal
       const [paymentsModalOpen, setPaymentsModalOpen] = useState(false)
@@ -151,6 +156,14 @@ export default function TratamientosClient({ paciente }) {
     title: '',
     message: '',
   })
+
+  const timelineDotClasses = (card) => {
+  const s = normalizeStatus(card?.status ?? card?.group_status)
+
+    if (s === 'Terminado') return 'bg-emerald-600 border-emerald-600'
+    if (s === 'En proceso') return 'bg-sky-600 border-sky-600'
+    return 'bg-amber-600 border-amber-600'
+  }
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -174,6 +187,36 @@ export default function TratamientosClient({ paciente }) {
 
   // ✅ renderiza cards (1 por grupo o 1 por single)
   const cards = useMemo(() => buildCardsFromTreatments(treatments || []), [treatments])
+
+  const filteredCards = useMemo(() => {
+    const q = String(search || '').trim().toLowerCase()
+
+    return (cards || []).filter((card) => {
+      const s = normalizeStatus(card?.status ?? card?.group_status)
+
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'in_progress' && s === 'En proceso') ||
+        (statusFilter === 'done' && s === 'Terminado')
+
+      if (!matchStatus) return false
+      if (!q) return true
+
+      // 🔎 busca en: nombre single + items del group + title si existiera
+      const parts = [
+        card?.title,
+        card?.group_title,
+        card?.service_name,
+        ...(card?.items || []).map((it) => it?.service_name),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return parts.includes(q)
+    })
+  }, [cards, statusFilter, search])
+
 
   const handleCardClick = (card) => {
     if (card?.isGroup) {
@@ -353,6 +396,7 @@ export default function TratamientosClient({ paciente }) {
       })
     }
   }
+  const cx = (...classes) => classes.filter(Boolean).join(' ')
 
   return (
     <div className="space-y-4">
@@ -360,7 +404,7 @@ export default function TratamientosClient({ paciente }) {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-base font-semibold">
-            {existRecords ? 'Tratamientos registrados:' : 'No hay tratamientos registrados:'}
+            {existRecords ? 'Tratamientos' : 'No hay tratamientos registrados:'}
           </p>
           {loading ? <p className="text-sm text-muted-foreground">Cargando…</p> : null}
         </div>
@@ -375,12 +419,114 @@ export default function TratamientosClient({ paciente }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {cards.map((card) => {
+      <div className="flex flex-col md:flex-row md:items-start md:gap-4">
+        <div className="shrink-0 self-start md:sticky md:top-4">
+         {
+          existRecords && (
+            <DiagramaTratamientos
+              activeIds={selectedTeeth}
+              onActiveIdsChange={setSelectedTeeth}
+            />
+          )
+         } 
+      </div>
+
+    <div className="w-full max-h-[60vh] overflow-y-auto bg-[#F5F7FB] rounded-xl">
+  <div className="sticky top-0 z-20 bg-[#F5F7FB] px-4 py-2">
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      {/* Segmented control */}
+      <div className="inline-flex w-full md:w-auto rounded-full bg-indigo-50 p-1">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('all')}
+          className={cx(
+            'h-11 flex-1 md:flex-none md:px-6 rounded-full text-sm font-semibold transition',
+            statusFilter === 'all'
+              ? 'bg-background text-primary shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          Todos
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter('in_progress')}
+          className={cx(
+            'h-11 flex-1 md:flex-none md:px-6 rounded-full text-sm font-semibold transition',
+            statusFilter === 'in_progress'
+              ? 'bg-background text-primary shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          En proceso
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStatusFilter('done')}
+          className={cx(
+            'h-11 flex-1 md:flex-none md:px-6 rounded-full text-sm font-semibold transition',
+            statusFilter === 'done'
+              ? 'bg-background text-primary shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          Terminados
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative w-full md:w-[360px]">
+        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar"
+          className="h-12 rounded-full pl-12 pr-12 bg-background"
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted"
+            aria-label="Limpiar"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+
+    {/* opcional: contador */}
+    <div className="mt-1 text-xs text-muted-foreground">
+      Mostrando {filteredCards.length} de {cards.length}
+    </div>
+  </div>
+      <div className="relative px-4 py-2">
+        { filteredCards.length > 1 && (
+        <div className="absolute left-4 top-0 bottom-0 w-px bg-border" aria-hidden="true" />
+                )
+              }
+        {filteredCards.map((card) => {
           const key = card.isGroup ? `group-${card.group_id}` : `t-${card.treatment_id}`
 
           return (
-            <div key={key} className="relative min-w-0">
+            <>
+            <div key={key} className="relative min-w-0 mb-3 pl-4">
+              { filteredCards.length > 1 && (
+                  <span
+                    aria-hidden="true"
+                    className={cx(
+                      'absolute -inset-0 top-5 -translate-x-1/2',
+                      'h-3 w-3 rounded-full border',
+                      'ring-background',
+                      timelineDotClasses(card)
+                    )}
+                  />
+                )
+              }
+
               {/* Dropdown de acciones (por card) */}
               <div className="absolute right-2 top-2 z-10">
                 <DropdownMenu>
@@ -389,7 +535,7 @@ export default function TratamientosClient({ paciente }) {
                       type="button"
                       variant="outline"
                       size="icon"
-                      className="h-8 w-8 bg-background/80 backdrop-blur"
+                      className="h-8 w-8 bg-background/80 backdrop-blur rounded-lg"
                       aria-label="Acciones"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -404,15 +550,15 @@ export default function TratamientosClient({ paciente }) {
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          openPayments(card)
-                        }}
-                      >
-                        <CreditCard className="mr-2 h-4 w-4" />
-                        Ver pagos
-                      </DropdownMenuItem>
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        openPayments(card)
+                      }}
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Ver pagos
+                    </DropdownMenuItem>
 
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
@@ -434,8 +580,11 @@ export default function TratamientosClient({ paciente }) {
                 onStatusClick={() => handleStatusClick(card)}
               />
             </div>
+            </>
           )
         })}
+      </div>
+    </div>
       </div>
 
       <ModalServicio

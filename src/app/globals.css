@@ -78,4 +78,8 @@
     color: hsl(var(--foreground));
     min-height: 100vh;
   }
+
+  .odontograma svg g[data-selected="true"] .cls-2 {
+  fill: #ffe08a; /* color de highlight */
+}
 }
