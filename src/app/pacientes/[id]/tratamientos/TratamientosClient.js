@@ -28,8 +28,6 @@ import api from '../../../../../lib/api'
 import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
 import { Input } from '@/components/ui/input'
 
-
-// ✅ Normaliza SIEMPRE a: ["Por Iniciar","En proceso","Terminado"]
 const normalizeStatus = (raw) => {
   const v = String(raw ?? '').trim().toLowerCase()
   if (!v) return 'Por Iniciar'
@@ -39,7 +37,6 @@ const normalizeStatus = (raw) => {
   return 'Por Iniciar'
 }
 
-// arma 1 card por group_id (y los singles NO traen items)
 function buildCardsFromTreatments(flat = []) {
   const byKey = new Map()
 
@@ -53,8 +50,6 @@ function buildCardsFromTreatments(flat = []) {
         group_id: gid || null,
         group_start_date: t?.service_date || null,
         group_status: null,
-
-        // single fields (también sirven como fallback)
         treatment_id: t?.treatment_id,
         service_name: t?.service_name,
         service_date: t?.service_date,
@@ -124,9 +119,10 @@ export default function TratamientosClient({ paciente }) {
   // modal nuevo tratamiento
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newRecordDate, setNewRecordDate] = useState('')
-  const [newRecordFiles, setNewRecordFiles] = useState([]) // compat
+  const [newRecordFiles, setNewRecordFiles] = useState([])
   const [selectedService, setSelectedService] = useState('')
   const [initialCost, setInitialCost] = useState('')
+  const [newTreatmentTeethIds, setNewTreatmentTeethIds] = useState([]) // ✅ para el modal
 
   // delete
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -233,6 +229,7 @@ export default function TratamientosClient({ paciente }) {
     setSelectedService('')
     setInitialCost('')
     setNewRecordFiles([])
+    setNewTreatmentTeethIds([])
   }
 
   const handleSaveRecord = async (payload) => {
@@ -242,7 +239,8 @@ export default function TratamientosClient({ paciente }) {
         await api.post(`/servicios/patient/${paciente.id}/group`, {
           title: payload.title,
           start_date: payload.start_date,
-          items: payload.items,
+          teeth_ids: payload.teeth_ids,
+          items: payload.items,      
         })
 
         handleCloseModal()
@@ -262,6 +260,8 @@ export default function TratamientosClient({ paciente }) {
         service_id: payload.service_id,
         service_date: payload.service_date,
         total_cost: payload.total_cost,
+        quantity: payload.quantity,
+        teeth_ids: payload.teeth_ids,
       })
 
       handleCloseModal()
@@ -600,6 +600,8 @@ export default function TratamientosClient({ paciente }) {
         handleSaveRecord={handleSaveRecord}
         newRecordFiles={newRecordFiles}
         setNewRecordFiles={setNewRecordFiles}
+        teethIds={newTreatmentTeethIds}
+        setTeethIds={setNewTreatmentTeethIds}
       />
 
       <ConfirmDeleteModal

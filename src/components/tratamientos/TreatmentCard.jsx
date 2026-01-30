@@ -170,6 +170,10 @@ export default function TreatmentCard({
               const n = it?.service_name || it?.name || 'Tratamiento'
               const qty = getQty(it)
               const itemCost = Number(getItemCost(it) || 0)
+                const teeth = Array.isArray(it?.groupTeethIds)
+                      ? it.groupTeethIds
+                      : (it?.groupTeethIds ? String(it.groupTeethIds).split(',').map(Number) : [])
+
               return (
                 <div key={`${n}-${idx}`} className="rounded-md bg-muted/50 p-2">
                   <p className="text-md font-semibold">
@@ -177,12 +181,31 @@ export default function TreatmentCard({
                     <span className="align-middle">{n}</span>
                   </p>
                   <div className="flex items-end justify-between gap-2 text-muted-foreground">
-                    <p className="text-base">
-                      No. Dientes: <span className="font-semibold text-foreground">{qty ?? '—'}</span>
-                    </p>
-                    <p className="text-base">
+                    {teeth.length > 0 && (
+                      <div className="text-base flex flex-wrap gap-2 justify-center items-center">
+                        <p className="mb-1">No. Dientes:</p>
+
+                        <div className="flex flex-wrap gap-2">
+                          {teeth.map((n) => (
+                            <Badge
+                              key={n}
+                              variant="primary"
+                              className="rounded-full px-1 cursor-pointer hover:bg-primary/80 hover:text-white"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // futuro: setSelectedTeeth([n]) o toggle
+                                console.log('clicked tooth', n)
+                              }}
+                            >
+                              {n}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* <p className="text-base">
                       Cantidad: <span className="font-semibold text-foreground">{qty ?? '—'}</span>
-                    </p>
+                    </p> */}
                     <p className="text-base">
                       Costo:{' '}
                       <span className="font-semibold text-foreground">{toMoney(itemCost)}</span>

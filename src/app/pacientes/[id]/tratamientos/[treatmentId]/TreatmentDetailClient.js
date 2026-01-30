@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 // shadcn/ui
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,6 +113,38 @@ function TreatmentDetailItem({
   const [newDate, setNewDate] = useState('')
   const [newFiles, setNewFiles] = useState([])
   const [previewFile, setPreviewFile] = useState(null)
+
+  const normalizeTeethIds = (v) => {
+  if (!v) return []
+
+  // ya viene como array
+  if (Array.isArray(v)) return v.map(Number).filter(Number.isFinite)
+
+  // viene como string (CSV o JSON)
+  if (typeof v === 'string') {
+    const s = v.trim()
+    if (!s) return []
+
+    // intenta JSON: "[26,27,28]"
+    try {
+      const parsed = JSON.parse(s)
+      if (Array.isArray(parsed)) return parsed.map(Number).filter(Number.isFinite)
+    } catch {}
+
+    // fallback CSV: "26,27,28"
+    return s
+      .split(',')
+      .map((x) => Number(x.trim()))
+      .filter(Number.isFinite)
+  }
+
+  return []
+}
+
+  const teethIds = useMemo(() => {
+  return normalizeTeethIds(tratamiento?.teethIds ?? tratamiento?.teeth_ids)
+}, [tratamiento?.teethIds, tratamiento?.teeth_ids])
+
 
   // sincroniza state interno si cambia initialTratamiento
   useEffect(() => {
@@ -415,80 +448,32 @@ function TreatmentDetailItem({
           )}
         </div>
 
-        {/* Cantidad */}
+        {/* Dientes */}
         <div className="flex flex-wrap items-center gap-3">
-          <p className="font-semibold">Cantidad:</p>
+          <p className="font-semibold">Dientes:</p>
 
-          {isEditingQty ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={editableQty}
-                onChange={(e) => setEditableQty(e.target.value)}
-                disabled={isUpdating}
-                className="w-[110px]"
-              />
-
-              <Button
-                type="button"
-                size="icon"
-                onClick={handleUpdateQuantity}
-                disabled={isUpdating}
-                aria-label="Guardar cantidad"
-                title="Guardar"
-              >
-                {isUpdating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4" />
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  setEditableQty(tratamiento?.quantity ?? 1)
-                  setIsEditingQty(false)
-                }}
-                disabled={isUpdating}
-                aria-label="Cancelar"
-                title="Cancelar"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+          {teethIds.length ? (
+            <div className="flex flex-wrap gap-2">
+              {teethIds.map((id) => (
+                <Badge
+                  key={id}
+                  variant="primary"
+                  className="rounded-full px-1 cursor-pointer hover:bg-primary hover:text-white"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // futuro: toggle/select de diente
+                    // setSelectedTooth(id) o algo así
+                  }}
+                >
+                  {id}
+                </Badge>
+              ))}
             </div>
           ) : (
-            <div
-              className={cx(
-                'group flex items-center gap-2 rounded-md px-2 py-1',
-                'hover:bg-muted/40 cursor-pointer'
-              )}
-              onClick={() => setIsEditingQty(true)}
-              role="button"
-              tabIndex={0}
-            >
-              <p className="text-lg font-semibold">{tratamiento?.quantity ?? 1}</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label="Editar cantidad"
-                title="Editar"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsEditingQty(true)
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="text-lg font-semibold">—</p>
           )}
         </div>
+
       </div>
 
       {/* loading/error docs */}
