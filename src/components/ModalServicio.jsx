@@ -31,7 +31,7 @@ const toMoney = (n) =>
 
 /** ✅ id robusto (id / service_id / serviceId / _id / pk) */
 const getServiceId = (s) => {
-  const v = s?.id ?? s?.service_id ?? s?.serviceId ?? s?._id ?? s?.pk
+  const v = s?.id ?? s?.service_id ?? s?.serviceId ?? s?._id
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
@@ -471,10 +471,6 @@ const handleToothClick = (toothId) => {
                 // ✅ modo manual: el parent decide el toggle por tratamiento
                 manual
                 onToothClick={handleToothClick}
-                selectedFill="#ff0000"     // Ejemplo: Rojo para los ya seleccionados
-  selectedStroke="#990000"
-  currentFill="#00ff00"      // Ejemplo: Verde para lo que estás seleccionando ahora
-  currentStroke="#004400"
               />
 
               <div className="rounded-2xl bg-muted p-3">

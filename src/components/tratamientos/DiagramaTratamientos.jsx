@@ -1,41 +1,47 @@
 // components/tratamientos/DiagramaTratamientos.jsx
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 const DEFAULT_SVG_PATH = '/tratamientos/diagrama.svg'
+
+// --- FDI: permanentes 11–48 (1..8) y temporales 51–85 (1..5)
+const isFDITooth = (n) => {
+  const q = Math.floor(n / 10)
+  const p = n % 10
+  if (q >= 1 && q <= 4) return p >= 1 && p <= 8
+  if (q >= 5 && q <= 8) return p >= 1 && p <= 5
+  return false
+}
 
 const extractToothId = (raw) => {
   const s = String(raw ?? '').trim()
   if (!s) return null
 
+  // "_28" o "28" o "_51"
   const direct = s.match(/^_?(\d{1,2})$/)
   if (direct) {
     const n = Number(direct[1])
-    if (Number.isFinite(n)) {
-      const q = Math.floor(n / 10)
-      const p = n % 10
-      const isFDI = [1, 2, 3, 4].includes(q) && p >= 1 && p <= 8
-      if (isFDI) return `_${n}`
-      if (n >= 1 && n <= 32) return `_${n}`
-    }
+    if (!Number.isFinite(n)) return null
+    if (isFDITooth(n)) return `_${n}`
+    if (n >= 1 && n <= 32) return `_${n}`
+    return null
   }
 
+  // último par de dígitos (ej: tooth_51_label -> 51)
   const all2 = s.match(/\d{2}/g)
   if (all2?.length) {
     const n = Number(all2[all2.length - 1])
-    if (Number.isFinite(n)) {
-      const q = Math.floor(n / 10)
-      const p = n % 10
-      const isFDI = [1, 2, 3, 4].includes(q) && p >= 1 && p <= 8
-      if (isFDI) return `_${n}`
-    }
+    if (Number.isFinite(n) && isFDITooth(n)) return `_${n}`
   }
 
+  // último número 1–2 dígitos
   const all = s.match(/\d{1,2}/g)
   if (all?.length) {
     const n = Number(all[all.length - 1])
-    if (Number.isFinite(n) && n >= 1 && n <= 32) return `_${n}`
+    if (!Number.isFinite(n)) return null
+    if (isFDITooth(n)) return `_${n}`
+    if (n >= 1 && n <= 32) return `_${n}`
   }
 
   return null
@@ -43,48 +49,64 @@ const extractToothId = (raw) => {
 
 const defaultIsInteractiveId = (id) => Boolean(extractToothId(id))
 
-const SHAPE_SEL = 'path, polygon, circle, rect, ellipse, use'
-const TEXT_SEL = 'text, tspan'
+// En tu SVG los dientes son <path class="cls-2"> (relleno blanco)
+const FILL_TARGET_SEL = '.cls-2'
 
-function rememberOriginalInlineStyle(el) {
-  if (el.getAttribute('data-orig-style-saved') === '1') return
-  el.setAttribute('data-orig-style-saved', '1')
+function rememberOriginal(el) {
+  if (el.getAttribute('data-orig-saved') === '1') return
+  el.setAttribute('data-orig-saved', '1')
+
+  // ✅ aquí estaba tu typo: era fill, no stroke
   el.setAttribute('data-orig-style-fill', el.style.getPropertyValue('fill') || '')
   el.setAttribute('data-orig-style-stroke', el.style.getPropertyValue('stroke') || '')
-  el.setAttribute('data-orig-style-textfill', el.style.getPropertyValue('color') || '')
+  el.setAttribute('data-orig-style-color', el.style.getPropertyValue('color') || '')
+
+  el.setAttribute('data-orig-attr-fill', el.getAttribute('fill') || '')
+  el.setAttribute('data-orig-attr-stroke', el.getAttribute('stroke') || '')
 }
 
 function paintShape(el, fill, stroke) {
-  rememberOriginalInlineStyle(el)
-  el.style.setProperty('fill', fill, 'important')
-  el.style.setProperty('stroke', stroke, 'important')
-  el.setAttribute('data-painted', '1')
-}
+  if (!el) return
+  rememberOriginal(el)
 
-function paintText(el, color) {
-  rememberOriginalInlineStyle(el)
-  // texto en SVG normalmente usa "fill"
-  el.style.setProperty('fill', color, 'important')
+  // ✅ aplica inline con !important
+  el.style.setProperty('fill', fill, 'important')
+
+  // stroke es opcional (pero si lo mandas, se verá un borde)
+  if (stroke) el.style.setProperty('stroke', stroke, 'important')
+
+  // fallback por atributo (algunos SVGs traen estilos agresivos)
+  el.setAttribute('fill', fill)
+  if (stroke) el.setAttribute('stroke', stroke)
+  else el.removeAttribute('stroke')
+
   el.setAttribute('data-painted', '1')
 }
 
 function restorePaint(el) {
-  const origFill = el.getAttribute('data-orig-style-fill') ?? ''
-  const origStroke = el.getAttribute('data-orig-style-stroke') ?? ''
-  const origTextFill = el.getAttribute('data-orig-style-textfill') ?? ''
+  const origStyleFill = el.getAttribute('data-orig-style-fill') ?? ''
+  const origStyleStroke = el.getAttribute('data-orig-style-stroke') ?? ''
+  const origStyleColor = el.getAttribute('data-orig-style-color') ?? ''
 
-  if (origFill) el.style.setProperty('fill', origFill)
+  const origAttrFill = el.getAttribute('data-orig-attr-fill') ?? ''
+  const origAttrStroke = el.getAttribute('data-orig-attr-stroke') ?? ''
+
+  if (origStyleFill) el.style.setProperty('fill', origStyleFill)
   else el.style.removeProperty('fill')
 
-  if (origStroke) el.style.setProperty('stroke', origStroke)
+  if (origStyleStroke) el.style.setProperty('stroke', origStyleStroke)
   else el.style.removeProperty('stroke')
 
-  // por si alguien usó color, lo dejamos limpio
-  if (origTextFill) el.style.setProperty('color', origTextFill)
+  if (origStyleColor) el.style.setProperty('color', origStyleColor)
   else el.style.removeProperty('color')
 
+  if (origAttrFill) el.setAttribute('fill', origAttrFill)
+  else el.removeAttribute('fill')
+
+  if (origAttrStroke) el.setAttribute('stroke', origAttrStroke)
+  else el.removeAttribute('stroke')
+
   el.removeAttribute('data-painted')
-  // NO borramos los data-orig-* para no re-salvar cada render
 }
 
 export default function DiagramaTratamientos({
@@ -105,9 +127,9 @@ export default function DiagramaTratamientos({
   isInteractiveId = defaultIsInteractiveId,
 
   selectedFill = '#cbc1f8',
-  selectedStroke = '#491b9a',
-  currentFill = '#7c3aed',
-  currentStroke = '#1e1b4b',
+  selectedStroke = '#cbc1f8',
+  currentFill = '#9E89FF',
+  currentStroke = '#9E89FF',
 
   className = '',
 }) {
@@ -122,6 +144,7 @@ export default function DiagramaTratamientos({
 
   const nodeMapRef = useRef(new Map())
 
+  // OJO: internalActiveIds se queda [] si tú pasas activeIds desde el parent (modo controlado)
   const resolvedActiveIds = useMemo(() => {
     const ids = activeIds ?? internalActiveIds
     return Array.isArray(ids) ? ids : []
@@ -131,10 +154,68 @@ export default function DiagramaTratamientos({
     return Array.isArray(currentIds) ? currentIds : []
   }, [currentIds])
 
-  const idsRef = useRef([])
-  useEffect(() => {
-    idsRef.current = resolvedActiveIds
-  }, [resolvedActiveIds])
+  const getSvg = () => wrapRef.current?.querySelector('svg') || null
+
+  const getRootByToothId = (svg, toothId) => {
+    if (!svg || !toothId) return null
+    const id = extractToothId(toothId)
+    if (!id) return null
+
+    const fromMap = nodeMapRef.current.get(id)
+    if (fromMap) return fromMap
+
+    // fallback
+    const safe = String(id).replace(/"/g, '\\"')
+    return svg.querySelector(`[data-tooth-id="${safe}"]`) || null
+  }
+
+  const clearAllPaint = (svg) => {
+    if (!svg) return
+    svg.querySelectorAll('[data-painted="1"]').forEach((el) => restorePaint(el))
+  }
+
+  // ✅ pinta SOLO .cls-2 dentro del grupo del diente
+  const paintTooth = (root, mode) => {
+    if (!root) return
+    const isCurrent = mode === 'current'
+    const fill = isCurrent ? currentFill : selectedFill
+    const stroke = isCurrent ? currentStroke : selectedStroke
+
+    const targets = []
+
+    // si el root mismo es cls-2
+    if (root.matches?.(FILL_TARGET_SEL)) targets.push(root)
+
+    // hijos cls-2
+    root.querySelectorAll?.(FILL_TARGET_SEL)?.forEach((n) => targets.push(n))
+
+    // fallback: si por alguna razón no hay cls-2, pinta el root completo
+    if (targets.length === 0) targets.push(root)
+    targets.forEach((el) => paintShape(el, fill, stroke))
+  }
+
+  const repaint = (activeList, currentList) => {
+    const svg = getSvg()
+    if (!svg) return
+
+    clearAllPaint(svg)
+
+    for (const id0 of activeList || []) {
+      const tid = extractToothId(id0)
+      if (!tid) continue
+      const root = getRootByToothId(svg, tid)
+      if (!root) continue
+      paintTooth(root, 'active')
+    }
+
+    for (const id0 of currentList || []) {
+      const tid = extractToothId(id0)
+      if (!tid) continue
+      const root = getRootByToothId(svg, tid)
+      if (!root) continue
+      paintTooth(root, 'current')
+    }
+  }
 
   // 1) cargar SVG
   useEffect(() => {
@@ -151,8 +232,7 @@ export default function DiagramaTratamientos({
       .then(async (r) => {
         const txt = await r.text()
         if (!r.ok) throw new Error(`No se pudo cargar SVG (${r.status})`)
-        if (!txt.includes('<svg'))
-          throw new Error('La respuesta no es un SVG (posible 404/basePath)')
+        if (!txt.includes('<svg')) throw new Error('La respuesta no es un SVG')
         return txt.replace(/^\s*<\?xml[^>]*\?>/i, '').trim()
       })
       .then((txt) => {
@@ -173,27 +253,20 @@ export default function DiagramaTratamientos({
     }
   }, [src])
 
-  // 2) preparar hotspots
-  useEffect(() => {
+  // 2) inyectar SVG + hotspots (layout)
+  useLayoutEffect(() => {
     if (!svgText) return
     const wrap = wrapRef.current
     if (!wrap) return
 
-    const svg = wrap.querySelector('svg')
+    wrap.innerHTML = svgText
+    const svg = getSvg()
     if (!svg) return
 
     svg.style.width = '100%'
     svg.style.height = 'auto'
 
     nodeMapRef.current = new Map()
-
-    svg.querySelectorAll('[data-tooth-id], .diagram-hotspot').forEach((n) => {
-      n.classList.remove('diagram-hotspot', 'is-active', 'is-current')
-      n.removeAttribute('tabindex')
-      n.removeAttribute('role')
-      n.removeAttribute('aria-label')
-      n.removeAttribute('data-tooth-id')
-    })
 
     const nodes = Array.from(svg.querySelectorAll('[id]'))
     for (const node of nodes) {
@@ -204,121 +277,23 @@ export default function DiagramaTratamientos({
       const toothId = extractToothId(rawId)
       if (!toothId) continue
 
-      let root = node
-      const tag = String(node.tagName || '').toLowerCase()
+      nodeMapRef.current.set(toothId, node)
 
-      // si es texto, sube a su grupo
-      if (tag === 'text' || tag === 'tspan') {
-        root = node.closest('g') || node
-      }
-
-      if (!nodeMapRef.current.has(toothId)) {
-        nodeMapRef.current.set(toothId, root)
-      } else {
-        // preferimos un <g> si aparece
-        const existing = nodeMapRef.current.get(toothId)
-        const existingTag = String(existing?.tagName || '').toLowerCase()
-        const rootTag = String(root?.tagName || '').toLowerCase()
-        if (existing && existingTag !== 'g' && rootTag === 'g') {
-          nodeMapRef.current.set(toothId, root)
-        }
-      }
-    }
-
-    for (const [toothId, root] of nodeMapRef.current.entries()) {
-      if (!root) continue
-      root.classList.add('diagram-hotspot')
-      root.setAttribute('data-tooth-id', toothId)
-      root.setAttribute('tabindex', '0')
-      root.setAttribute('role', 'button')
-      root.setAttribute('aria-label', `Diente ${toothId.replace(/^_/, '')}`)
-
-      // para que el click en hijos funcione
-      root.querySelectorAll('*').forEach((child) => {
+      // marca TODO el grupo como clickable
+      node.setAttribute('data-tooth-id', toothId)
+      node.querySelectorAll('*').forEach((child) => {
         child.setAttribute('data-tooth-id', toothId)
       })
     }
   }, [svgText, isInteractiveId])
 
-  const getRootByToothId = (svg, toothId) => {
-    if (!svg || !toothId) return null
-    const id = extractToothId(toothId)
-    if (!id) return null
-
-    const fromMap = nodeMapRef.current.get(id)
-    if (fromMap) return fromMap
-
-    const safe = String(id).replace(/"/g, '\\"')
-    const byHotspot = svg.querySelector(`.diagram-hotspot[data-tooth-id="${safe}"]`)
-    if (byHotspot) return byHotspot
-
-    const byData = svg.querySelector(`[data-tooth-id="${safe}"]`)
-    return byData?.closest?.('.diagram-hotspot') || byData || null
-  }
-
-  // ✅ pinta por JS (important) para que SIEMPRE se vea
-  const paintTooth = (root, mode) => {
-    if (!root) return
-    const fill = mode === 'current' ? currentFill : selectedFill
-    const stroke = mode === 'current' ? currentStroke : selectedStroke
-
-    const allShapes = []
-    // si el root es figura
-    if (root.matches?.(SHAPE_SEL)) allShapes.push(root)
-    // figuras hijas
-    root.querySelectorAll?.(SHAPE_SEL).forEach((n) => allShapes.push(n))
-
-    const allText = []
-    if (root.matches?.(TEXT_SEL)) allText.push(root)
-    root.querySelectorAll?.(TEXT_SEL).forEach((n) => allText.push(n))
-
-    allShapes.forEach((el) => paintShape(el, fill, stroke))
-    allText.forEach((el) => paintText(el, stroke))
-  }
-
-  const clearAllPaint = (svg) => {
-    if (!svg) return
-    svg.querySelectorAll('[data-painted="1"]').forEach((el) => restorePaint(el))
-  }
-
-  // 3) clases + pintado
-  useEffect(() => {
-    const wrap = wrapRef.current
-    if (!wrap) return
-    const svg = wrap.querySelector('svg')
-    if (!svg) return
-
-    // limpia clases
-    svg
-      .querySelectorAll('.diagram-hotspot.is-active, .diagram-hotspot.is-current')
-      .forEach((n) => {
-        n.classList.remove('is-active')
-        n.classList.remove('is-current')
-      })
-
-    // limpia pintado anterior
-    clearAllPaint(svg)
-
-    // primero activos (unión)
-    for (const id0 of resolvedActiveIds) {
-      const tid = extractToothId(id0)
-      if (!tid) continue
-      const root = getRootByToothId(svg, tid)
-      if (!root) continue
-      root.classList.add('is-active')
-      paintTooth(root, 'active')
-    }
-
-    // luego current (prioridad)
-    for (const id0 of resolvedCurrentIds) {
-      const tid = extractToothId(id0)
-      if (!tid) continue
-      const root = getRootByToothId(svg, tid)
-      if (!root) continue
-      root.classList.add('is-current')
-      paintTooth(root, 'current')
-    }
+  // 3) repintar siempre que cambien ids o colores
+  useLayoutEffect(() => {
+    if (!svgText) return
+    repaint(resolvedActiveIds, resolvedCurrentIds)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    svgText,
     resolvedActiveIds,
     resolvedCurrentIds,
     selectedFill,
@@ -328,7 +303,6 @@ export default function DiagramaTratamientos({
   ])
 
   const emitIds = (nextIds) => {
-    idsRef.current = nextIds
     onActiveIdsChange?.(nextIds)
     if (activeIds == null) setInternalActiveIds(nextIds)
     onChange?.(nextIds)
@@ -338,8 +312,9 @@ export default function DiagramaTratamientos({
     const id = extractToothId(toothId)
     if (!id) return
 
-    const current = Array.isArray(idsRef.current) ? idsRef.current : []
+    const current = Array.isArray(resolvedActiveIds) ? resolvedActiveIds : []
     const normalized = current.map(extractToothId).filter(Boolean)
+
     const next = new Set(normalized)
     const wasSelected = next.has(id)
 
@@ -347,6 +322,10 @@ export default function DiagramaTratamientos({
     else next.add(id)
 
     const nextIds = Array.from(next)
+
+    // ✅ repaint “optimista” inmediato (evita sensación de lag en modo controlado)
+    repaint(nextIds, resolvedCurrentIds)
+
     emitIds(nextIds)
     onToggle?.({ id, selected: !wasSelected, ids: nextIds })
   }
@@ -359,6 +338,7 @@ export default function DiagramaTratamientos({
       onToothClick?.(id)
       return
     }
+
     toggleIdInternal(id)
   }
 
@@ -385,14 +365,13 @@ export default function DiagramaTratamientos({
   let content = null
   if (loading) content = <div className="text-sm text-muted-foreground">Cargando diagrama…</div>
   else if (err) content = <div className="text-sm text-destructive">{err}</div>
-  else if (svgText) {
+  else {
     content = (
       <div
         ref={wrapRef}
         className={`diagram-wrap ${className}`}
         onClick={onClick}
         onKeyDown={onKeyDown}
-        dangerouslySetInnerHTML={{ __html: svgText }}
       />
     )
   }
@@ -401,7 +380,6 @@ export default function DiagramaTratamientos({
     <div className="w-[400px] h-[500px] mx-auto bg-indigo-50 rounded-2xl p-4">
       {content}
 
-      {/* Nota: el style va DESPUÉS del SVG inyectado, por si el SVG trae <style> interno */}
       <style jsx global>{`
         .diagram-wrap {
           width: 100%;
@@ -418,24 +396,13 @@ export default function DiagramaTratamientos({
           height: auto;
         }
 
-        /* evita que el SVG “mate” eventos */
-        .diagram-wrap .diagram-hotspot,
-        .diagram-wrap .diagram-hotspot * {
-          pointer-events: auto !important;
-        }
-
-        .diagram-wrap .diagram-hotspot {
+        .diagram-wrap [data-tooth-id] {
           cursor: pointer;
-          transition: filter 120ms ease, opacity 120ms ease;
         }
 
-        .diagram-wrap .diagram-hotspot:hover {
-          opacity: 0.92;
+        .diagram-wrap [data-tooth-id]:hover {
+          opacity: 0.96;
           filter: drop-shadow(0 2px 6px rgba(73, 27, 154, 0.25));
-        }
-
-        .diagram-wrap .diagram-hotspot:focus {
-          outline: none;
         }
       `}</style>
     </div>
