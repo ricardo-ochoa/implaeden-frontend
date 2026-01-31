@@ -578,9 +578,10 @@ const handleToothClick = (toothId) => {
                       return (
                         <div
                           key={sid}
-                          className={`flex flex-col gap-2 rounded-2xl p-2 ${
+                          className={`flex flex-col gap-2 rounded-2xl p-2 cursor-pointer hover:bg-muted/50 ${
                             isActive ? 'bg-indigo-50/60 ring-1 ring-indigo-200' : ''
                           }`}
+                          onClick={() => setActiveServiceId(sid)}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">

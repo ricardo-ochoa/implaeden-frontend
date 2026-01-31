@@ -403,6 +403,7 @@ export default function DiagramaTratamientos({
         .diagram-wrap [data-tooth-id]:hover {
           opacity: 0.96;
           filter: drop-shadow(0 2px 6px rgba(73, 27, 154, 0.25));
+          cursor: pointer;
         }
       `}</style>
     </div>
