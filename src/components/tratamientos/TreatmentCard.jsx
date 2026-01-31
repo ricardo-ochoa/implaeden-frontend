@@ -97,6 +97,8 @@ export default function TreatmentCard({
   const year = date ? String(date.getFullYear()) : '—'
   const month = date ? monthLabel(date) : '—'
 
+         console.log("items", items)
+
   return (
     <button
       type="button"
@@ -170,9 +172,9 @@ export default function TreatmentCard({
               const n = it?.service_name || it?.name || 'Tratamiento'
               const qty = getQty(it)
               const itemCost = Number(getItemCost(it) || 0)
-                const teeth = Array.isArray(it?.groupTeethIds)
-                      ? it.groupTeethIds
-                      : (it?.groupTeethIds ? String(it.groupTeethIds).split(',').map(Number) : [])
+                const teeth = Array.isArray(it?.teethIds)
+                      ? it.teethIds
+                      : (it?.teethIds ? String(it.teethIds).split(',').map(Number) : [])
 
               return (
                 <div key={`${n}-${idx}`} className="rounded-md bg-muted/50 p-2">

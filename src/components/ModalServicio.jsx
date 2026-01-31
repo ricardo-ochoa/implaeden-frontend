@@ -411,11 +411,13 @@ const handleToothClick = (toothId) => {
       const t = teethByServiceId?.[sid] || []
       return {
         service_id: sid,
+        service_date: newRecordDate, // ✅ agrega esto
         total_cost: parseMoney(rawCost),
-        teeth_ids: t,                 // ✅ dientes propios del tratamiento
-        quantity: t.length,           // ✅ cantidad = # dientes del tratamiento (0 si none)
+        teeth_ids: t,
+        quantity: t.length,
       }
     })
+
 
     // ✅ opcional: unión (por compat/back)
     const unionTeeth = allTeethIds

@@ -25,7 +25,7 @@ const ConfirmDeleteModal = ({ open, onClose, title, description, onConfirm }) =>
           width: '90%',
           bgcolor: 'background.paper',
           p: 4,
-          borderRadius: 2,
+          borderRadius: 1,
           boxShadow: 24,
         }}
       >

@@ -233,35 +233,23 @@ export default function TratamientosClient({ paciente }) {
   }
 
   const handleSaveRecord = async (payload) => {
-    try {
-      // Caso 1: GRUPO (ModalServicio manda: { title, start_date, items })
-      if (payload?.items?.length > 1) {
-        await api.post(`/servicios/patient/${paciente.id}/group`, {
-          title: payload.title,
-          start_date: payload.start_date,
-          teeth_ids: payload.teeth_ids,
-          items: payload.items,      
-        })
+  try {
+    // ✅ Caso 1: GRUPO
+    if (payload?.items?.length > 1) {
+      const services = (payload.items || []).map((it) => ({
+        service_id: it.service_id,
+        // 👇 obligatorio para tu backend
+        service_date: payload.start_date, // o newRecordDate
+        total_cost: it.total_cost,
+        quantity: it.quantity ?? 0,
+        teeth_ids: it.teeth_ids ?? [],
+        status: it.status ?? 'Por Iniciar',
+        notes: it.notes ?? null,
+      }))
 
-        handleCloseModal()
-        await fetchPatientTreatments()
-
-        setToast({
-          open: true,
-          variant: 'success',
-          title: 'Listo',
-          message: 'Paquete de tratamientos creado correctamente.',
-        })
-        return
-      }
-
-      // Caso 2: SINGLE
       await api.post(`/pacientes/${paciente.id}/tratamientos`, {
-        service_id: payload.service_id,
-        service_date: payload.service_date,
-        total_cost: payload.total_cost,
-        quantity: payload.quantity,
-        teeth_ids: payload.teeth_ids,
+        title: payload.title,
+        services,
       })
 
       handleCloseModal()
@@ -271,18 +259,40 @@ export default function TratamientosClient({ paciente }) {
         open: true,
         variant: 'success',
         title: 'Listo',
-        message: 'Tratamiento creado correctamente.',
+        message: 'Paquete de tratamientos creado correctamente.',
       })
-    } catch (err) {
-      console.error('Error al guardar el tratamiento:', err)
-      setToast({
-        open: true,
-        variant: 'error',
-        title: 'Error',
-        message: 'No se pudo guardar el tratamiento.',
-      })
+      return
     }
+
+    // ✅ Caso 2: SINGLE (se queda igual)
+    await api.post(`/pacientes/${paciente.id}/tratamientos`, {
+      service_id: payload.service_id,
+      service_date: payload.service_date,
+      total_cost: payload.total_cost,
+      quantity: payload.quantity,
+      teeth_ids: payload.teeth_ids,
+    })
+
+    handleCloseModal()
+    await fetchPatientTreatments()
+
+    setToast({
+      open: true,
+      variant: 'success',
+      title: 'Listo',
+      message: 'Tratamiento creado correctamente.',
+    })
+  } catch (err) {
+    console.error('Error al guardar el tratamiento:', err)
+    setToast({
+      open: true,
+      variant: 'error',
+      title: 'Error',
+      message: 'No se pudo guardar el tratamiento.',
+    })
   }
+}
+
 
   const handleStatusClick = (treatment) => {
     setSelectedTreatment(treatment)
