@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CheckCircle2, Timer, CircleDot, Layers } from 'lucide-react'
+import ToothBadge from '../ToothBadge'
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
@@ -97,8 +98,6 @@ export default function TreatmentCard({
   const year = date ? String(date.getFullYear()) : '—'
   const month = date ? monthLabel(date) : '—'
 
-         console.log("items", items)
-
   return (
     <button
       type="button"
@@ -130,31 +129,32 @@ export default function TreatmentCard({
         </div>
 
         <Badge
-          role={typeof onStatusClick === 'function' ? 'button' : undefined}
-          tabIndex={typeof onStatusClick === 'function' ? 0 : undefined}
-          className={cx(
-            'border select-none cursor-default px-3 py-1 text-sm',
-            meta.badge,
-            typeof onStatusClick === 'function' ? 'cursor-pointer' : ''
-          )}
-          onClick={(e) => {
-            if (typeof onStatusClick !== 'function') return
-            e.preventDefault()
-            e.stopPropagation()
-            onStatusClick()
-          }}
-          onKeyDown={(e) => {
-            if (typeof onStatusClick !== 'function') return
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              e.stopPropagation()
-              onStatusClick()
-            }
-          }}
-        >
-          <StatusIcon className="mr-2 h-4 w-4" />
-          {meta.label}
-        </Badge>
+  role={typeof onStatusClick === 'function' ? 'button' : undefined}
+  tabIndex={typeof onStatusClick === 'function' ? 0 : undefined}
+  className={cx(
+    'border select-none cursor-default px-3 py-1 text-sm',
+    meta.badge,
+    typeof onStatusClick === 'function' ? 'cursor-pointer' : ''
+  )}
+  onClick={(e) => {
+    if (typeof onStatusClick !== 'function') return
+    e.preventDefault()
+    e.stopPropagation()
+    onStatusClick(treatment) // ✅ pásale el card/treatment
+  }}
+  onKeyDown={(e) => {
+    if (typeof onStatusClick !== 'function') return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      e.stopPropagation()
+      onStatusClick(treatment) // ✅ pásale el card/treatment
+    }
+  }}
+>
+  <StatusIcon className="mr-2 h-4 w-4" />
+  {meta.label}
+</Badge>
+
       </div>
 
       <Separator className="my-3" />
@@ -189,18 +189,13 @@ export default function TreatmentCard({
 
                         <div className="flex flex-wrap gap-2">
                           {teeth.map((n) => (
-                            <Badge
+                            <ToothBadge
                               key={n}
-                              variant="primary"
-                              className="rounded-full px-1 cursor-pointer hover:bg-primary/80 hover:text-white"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                // futuro: setSelectedTeeth([n]) o toggle
-                                console.log('clicked tooth', n)
+                              tooth={n}
+                              onClick={(tooth) => {
+                                console.log('clicked tooth', tooth)
                               }}
-                            >
-                              {n}
-                            </Badge>
+                            />
                           ))}
                         </div>
                       </div>

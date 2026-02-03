@@ -2,7 +2,8 @@
 import { PatientProvider } from "@/context/PatientContext";
 import ClientThemeProvider from "@/components/ClientThemeProvider";
 import Header from "@/components/Header";
-import "./globals.css";
+import 'quill/dist/quill.snow.css'
+import './globals.css'
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import "@assistant-ui/react-ui/styles/index.css";

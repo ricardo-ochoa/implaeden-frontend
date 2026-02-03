@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
 
-    --primary: 210 79% 46%;
+    --primary: 217 100% 50%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 299 100% 50%;
@@ -31,13 +31,14 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: var(--primary);
-
     --radius: 0.5rem;
+    --background-overlay: 0 0% 97%;
   }
 
   /* cuando el <html> tenga class="dark" */
   .dark {
     --background: 0 0% 10%;
+    --background-overlay:  0 0% 10%;
     --foreground: 0 0% 98%;
 
     --card: 0 0% 3.9%;
@@ -47,7 +48,7 @@
     --popover-foreground: 0 0% 98%;
 
     /* si quieres conservar azul/magenta en dark, déjalos igual */
-    --primary: 210 79% 46%;
+    --primary: 217 100% 50%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 299 100% 50%;
@@ -82,4 +83,57 @@
   .odontograma svg g[data-selected="true"] .cls-2 {
   fill: #ffe08a; /* color de highlight */
 }
+}
+
+/* Base: que Quill herede tu UI */
+.comment-quill .ql-toolbar.ql-snow {
+  border: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background-overlay));
+}
+
+.comment-quill .ql-container.ql-snow {
+  border: 0;
+  background: hsl(var(--background));
+}
+
+.comment-quill .ql-editor {
+  color: hsl(var(--foreground));
+}
+
+/* Placeholder */
+.comment-quill .ql-editor.ql-blank::before {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Dropdowns / pickers / tooltips */
+.comment-quill .ql-snow .ql-picker-options {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+}
+
+.comment-quill .ql-snow .ql-tooltip {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+/* Íconos (stroke/fill) para que se vean en dark */
+.dark .comment-quill .ql-snow .ql-stroke {
+  stroke: hsl(var(--foreground));
+}
+.dark .comment-quill .ql-snow .ql-fill,
+.dark .comment-quill .ql-snow .ql-stroke.ql-fill {
+  fill: hsl(var(--foreground));
+}
+.dark .comment-quill .ql-snow .ql-picker {
+  color: hsl(var(--foreground));
+}
+
+/* Botones hover/active */
+.dark .comment-quill .ql-snow.ql-toolbar button:hover,
+.dark .comment-quill .ql-snow .ql-toolbar button:hover,
+.dark .comment-quill .ql-snow.ql-toolbar button.ql-active,
+.dark .comment-quill .ql-snow .ql-toolbar button.ql-active {
+  background: hsl(var(--accent));
 }

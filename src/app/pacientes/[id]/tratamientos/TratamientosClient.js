@@ -27,6 +27,7 @@ import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments'
 import api from '../../../../../lib/api'
 import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
 import { Input } from '@/components/ui/input'
+import useTreatmentStatusModal from '../../../../../lib/hooks/useTreatmentStatusModal'
 
 const normalizeStatus = (raw) => {
   const v = String(raw ?? '').trim().toLowerCase()
@@ -123,6 +124,23 @@ export default function TratamientosClient({ paciente }) {
   const [selectedService, setSelectedService] = useState('')
   const [initialCost, setInitialCost] = useState('')
   const [newTreatmentTeethIds, setNewTreatmentTeethIds] = useState([]) // ✅ para el modal
+
+  const { openFor, modalProps } = useTreatmentStatusModal({
+  patientId: paciente.id,
+  onAfterSave: async ({ target }) => {
+    await fetchPatientTreatments()
+
+    setToast({
+      open: true,
+      variant: 'success',
+      title: 'Listo',
+      message: target?.isGroup
+        ? 'Estado del paquete actualizado correctamente.'
+        : 'Estado actualizado correctamente.',
+    })
+  },
+})
+
 
   // delete
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -554,9 +572,9 @@ export default function TratamientosClient({ paciente }) {
                   </DropdownMenuTrigger>
 
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleStatusClick(card)}>
+                    <DropdownMenuItem onClick={() => openFor(card)}>
                       <Pencil className="mr-2 h-4 w-4" />
-                      Cambiar status
+                      Cambiar estatus
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -587,7 +605,7 @@ export default function TratamientosClient({ paciente }) {
               <TreatmentCard
                 treatment={card}
                 onClick={() => handleCardClick(card)}
-                onStatusClick={() => handleStatusClick(card)}
+                onStatusClick={openFor}
               />
             </div>
             </>
@@ -629,14 +647,7 @@ export default function TratamientosClient({ paciente }) {
         onConfirm={handleDeleteRecord}
       />
 
-      <UpdateStatusModal
-        open={statusModalOpen}
-        onClose={() => setStatusModalOpen(false)}
-        treatment={selectedTreatment}
-        newStatus={newStatus}
-        setNewStatus={setNewStatus}
-        onSave={handleSaveStatus}
-      />
+      <UpdateStatusModal {...modalProps} />
 
       <TreatmentPaymentsModal
         open={paymentsModalOpen}
