@@ -24,6 +24,9 @@ import ModalServicio from '@/components/ModalServicio'
 import api from '../../../../../../lib/api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CheckCircle2, X } from 'lucide-react'
+import TreatmentCommentsTimeline from '@/components/tratamientos/TreatmentCommentsTimeline'
+import useTreatmentComments from '../../../../../../lib/hooks/useTreatmentComments'
+import useTeethCatalog from '../../../../../../lib/hooks/useTeethCatalog'
 
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
@@ -82,6 +85,7 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
   description: '',
 })
 
+const { teethMap, toothOptions: allToothOptions } = useTeethCatalog()
 
 const openEditModal = (scope = 'single') => {
   if (!selectedTreatment) return
@@ -237,6 +241,22 @@ const { openFor, modalProps } = useTreatmentStatusModal({
   const [comment, setComment] = useState('')
   const [files, setFiles] = useState([])
 
+  const {
+  comments,
+  loading: commentsLoading,
+  saving: commentsSaving,
+  createComment,
+  deleteComment,
+  fetchComments,
+} = useTreatmentComments(paciente?.id, selectedTreatment?.treatment_id)
+
+const relatedTeethOptions = useMemo(() => {
+  return (relatedTeeth || []).map((id) => ({
+    id: Number(id),
+    label: teethMap.get(Number(id)) || `Diente ${id}`,
+  }))
+}, [relatedTeeth, teethMap])
+
   // ✅ reset al cambiar de tratamiento
   useEffect(() => {
     setSelectedTeeth([])
@@ -290,6 +310,8 @@ const refreshCurrentTreatments = async () => {
   setTreatmentsState(all)
 }
 
+
+
 const normalizeStatusLocal = (raw) => {
   const v = String(raw ?? '').trim().toLowerCase()
   if (!v) return 'Por Iniciar'
@@ -310,8 +332,9 @@ const derivedGroupStatus = useMemo(() => {
   return allDone ? 'Terminado' : anyInProgress ? 'En proceso' : 'Por Iniciar'
 }, [treatmentsState])
 
-
-
+useEffect(() => {
+  if (selectedTreatment?.treatment_id) fetchComments?.()
+}, [selectedTreatment?.treatment_id, fetchComments])
 
   const card = useMemo(() => {
   const one = treatmentsState[0]
@@ -537,6 +560,20 @@ const modalInitialTreatment = useMemo(() => {
   return selectedTreatment
 }, [many, editScope, treatmentsState, selectedTreatment, card?.title, card?.group_id])
 
+const treatmentsById = useMemo(() => {
+  const m = {}
+  ;(treatmentsState || []).forEach((t) => {
+    const tid = Number(t?.treatment_id ?? t?.id)
+    if (!tid) return
+    m[tid] = {
+      name: t?.service_name || 'Tratamiento',
+      status: t?.status,
+    }
+  })
+  return m
+}, [treatmentsState])
+
+
 
   return (
     <div className="space-y-4">
@@ -601,14 +638,16 @@ const modalInitialTreatment = useMemo(() => {
           }}
         >
           {selectedTreatment ? (
-            <div className="space-y-3">
+            <div>
               <TreatmentEvidenceCard
                 title={selectedTreatment?.service_name || 'Tratamiento'}
+                treatment={selectedTreatment}
+                patientId={paciente?.id}
                 date={treatmentsState?.[0]?.group_start_date}
                 relatedTeeth={relatedTeeth}
                 cost={Number(selectedTreatment?.total_cost || 0)}
                 teeth={relatedTeeth}
-                teethOptions={relatedTeeth.map((n) => ({ id: n, label: String(n) }))}
+                teethOptions={relatedTeethOptions}
                 selectedTeeth={selectedTeeth}
                 onSelectedTeethChange={setSelectedTeeth}
                 comment={comment}
@@ -626,15 +665,36 @@ const modalInitialTreatment = useMemo(() => {
                   }
                   return false
                 }}
-                onSubmit={({ selectedTeeth, comment, files }) => {
-                  console.log('submit evidence', {
-                    treatmentId: selectedTreatmentId,
-                    selectedTeeth,
-                    comment,
+                onSubmit={async ({ selectedTeeth, comment, files }) => {
+                  await createComment({
+                    commentHtml: comment,
+                    teethIds: selectedTeeth,
                     files,
                   })
+
+                  // ✅ limpia draft
+                  setSelectedTeeth([])
+                  setComment('')
+                  setFiles([])
+
+                  // opcional: bump para refrescar drawer/otros
+                  bumpEvents?.()
                 }}
               />
+              {commentsLoading ? (
+                <div className="p-4 text-sm text-muted-foreground">Cargando comentarios…</div>
+              ) : (
+                <TreatmentCommentsTimeline
+                  items={comments}
+                  treatmentsById={treatmentsById}
+                  toothOptions={allToothOptions}
+                  onDelete={(item) => deleteComment(item.id)}
+                  onMediaClick={({ item, media, index }) => {
+                    // aquí conectas FilePreviewModal
+                    console.log('open media', { item, media, index })
+                  }}
+                />
+              )}
             </div>
           ) : (
             <div className="p-4 text-sm text-muted-foreground">

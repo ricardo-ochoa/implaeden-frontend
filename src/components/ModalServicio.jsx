@@ -118,7 +118,6 @@ export default function ModalServicio({
   handleUpdateRecord,
   focusServiceId = null,
 }) {
-  console.log("savedDate", savedDate)
   const { services, loading, error, fetchServices } = useServices()
 
   const [pickerOpen, setPickerOpen] = useState(false)

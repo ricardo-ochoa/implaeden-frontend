@@ -12,6 +12,8 @@ import TreatmentHeader from './tratamientos/TreatmentHeader'
 import EvidencePicker from './tratamientos/EvidencePicker'
 import ModalServicio from '@/components/ModalServicio'
 import api from '../../lib/api'
+import EvidencePreviewGrid from './EvidencePreviewGrid'
+import useTreatmentComments from '../../lib/hooks/useTreatmentComments'
 
 
 const cx = (...c) => c.filter(Boolean).join(' ')
@@ -57,6 +59,9 @@ export default function TreatmentEvidenceCard({
   const teethValue = selectedTeeth ?? localTeeth
   const commentValue = comment ?? localComment
   const filesValue = files ?? localFiles
+  // console.log("treatment", treatment)
+  const treatmentId = treatment?.treatment_id
+  const { createComment, saving } = useTreatmentComments(patientId, treatmentId)
 
   const setTeeth = (v) =>
     onSelectedTeethChange ? onSelectedTeethChange(v) : setLocalTeeth(v)
@@ -70,13 +75,17 @@ export default function TreatmentEvidenceCard({
     !submitting &&
     (String(commentValue || '').trim().length > 0 || (filesValue?.length ?? 0) > 0)
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     if (!canSubmit) return
-    await onSubmit?.({
-      selectedTeeth: teethValue,
-      comment: commentValue,
+    await createComment({
+      commentHtml: commentValue,
+      teethIds: teethValue,
       files: filesValue,
     })
+    
+    setComment('')
+    setFiles([])
+    setTeeth([])
   }
 
 const ymdToIsoLocalMidnight = (ymd) => {
@@ -126,6 +135,25 @@ const handleUpdateRecord = async (payload) => {
   }
 }
 
+const handlePickFiles = (picked) => {
+  // ✅ append + dedupe opcional
+  const all = [...(filesValue || []), ...(picked || [])]
+
+  // dedupe por name+size+lastModified (opcional pero recomendado)
+  const seen = new Set()
+  const deduped = all.filter((f) => {
+    const key = `${f.name}-${f.size}-${f.lastModified}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  setFiles(deduped)
+}
+
+const removeFileAt = (index) => {
+  setFiles((filesValue || []).filter((_, i) => i !== index))
+}
 
 
   return (
@@ -177,13 +205,19 @@ const handleUpdateRecord = async (payload) => {
           disabled={disabled || submitting}
         />
 
+        <EvidencePreviewGrid
+          files={filesValue}
+          onRemove={removeFileAt}
+          disabled={disabled || submitting}
+        />
+
         {/* Acciones */}
         <div className="flex items-center justify-end gap-3 mt-3">
-          <EvidencePicker
-            value={filesValue}
-            onChange={setFiles}
-            disabled={disabled || submitting}
-          />
+            <EvidencePicker
+              value={filesValue}
+              onChange={handlePickFiles}
+              disabled={disabled || submitting}
+            />
 
           <Button
             type="button"
