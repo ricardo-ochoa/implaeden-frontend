@@ -110,12 +110,15 @@ export default function ModalServicio({
   initialCost,
   setInitialCost,
   handleSaveRecord,
-
-  // compat (antes era "teethIds global"):
-  // ahora lo usamos solo como salida opcional (unión) o fallback inicial
+  savedDate,
   teethIds = [],
   setTeethIds,
+  mode = 'create',
+  initialTreatment = null,
+  handleUpdateRecord,
+  focusServiceId = null,
 }) {
+  console.log("savedDate", savedDate)
   const { services, loading, error, fetchServices } = useServices()
 
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -127,11 +130,89 @@ export default function ModalServicio({
 
   const [teethByServiceId, setTeethByServiceId] = useState({}) // { [sid:number]: string[] }
   const [activeServiceId, setActiveServiceId] = useState(null) // sid que estás editando en el diagrama
+  const [treatmentIdByServiceId, setTreatmentIdByServiceId] = useState({}) // { [sid]: treatment_id }
 
   useEffect(() => {
     if (open) fetchServices()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  const getTreatmentId = (x) => Number(x?.treatment_id ?? x?.id ?? null)
+const getServiceIdFromItem = (x) => Number(x?.service_id ?? x?.serviceId ?? x?.service?.id ?? null)
+const normTeethArray = (arr) =>
+  (Array.isArray(arr) ? arr : [])
+    .map((t) => normalizeToothId(t))
+    .filter(Boolean)
+
+    const toYMD = (v) => {
+  const m = String(v ?? '').match(/^(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : ''
+}
+
+useEffect(() => {
+  if (!open) return
+  if (mode !== 'edit') return
+  if (!initialTreatment) return
+
+  const isGroupEdit = Boolean(initialTreatment?.isGroup) || Array.isArray(initialTreatment?.items)
+  const items = isGroupEdit
+    ? (Array.isArray(initialTreatment?.items) ? initialTreatment.items : [])
+    : [initialTreatment]
+
+  // ✅ fecha inicial
+  const initialDate =
+    (isGroupEdit ? initialTreatment?.group_start_date : initialTreatment?.service_date) ||
+    items?.[0]?.service_date ||
+    ''
+
+  setNewRecordDate?.(toYMD(initialDate))
+
+  // ✅ título de grupo (solo display/edición si luego haces endpoint para groups)
+  if (isGroupEdit) {
+    setGroupTitle(String(initialTreatment?.group_title || initialTreatment?.title || 'Paquete de tratamientos'))
+  }
+
+  const nextIds = []
+  const nextCost = {}
+  const nextTeeth = {}
+  const nextMap = {}
+
+  for (const it of items) {
+    const sid = getServiceIdFromItem(it)
+    const tid = getTreatmentId(it)
+    if (!Number.isFinite(sid) || !Number.isFinite(tid)) continue
+
+    nextIds.push(sid)
+    nextMap[sid] = tid
+
+    const c = it?.total_cost ?? 0
+    nextCost[sid] = String(Number(c || 0).toFixed(2))
+    nextCost[String(sid)] = String(Number(c || 0).toFixed(2))
+
+    nextTeeth[sid] = normTeethArray(it?.teeth_ids)
+  }
+
+  const uniqIds = Array.from(new Set(nextIds))
+  setSelectedServiceIds(uniqIds)
+  setTreatmentIdByServiceId(nextMap)
+  setCostById(nextCost)
+  setTeethByServiceId(nextTeeth)
+
+  const focus = Number(focusServiceId)
+const initialActive =
+  Number.isFinite(focus) && uniqIds.includes(focus)
+    ? focus
+    : (uniqIds.length ? uniqIds[0] : null)
+
+setActiveServiceId(initialActive)
+
+  // compat (si alguien usa selectedService/initialCost con single)
+  if (!isGroupEdit && uniqIds.length === 1) {
+    setSelectedService?.(uniqIds[0])
+    setInitialCost?.(nextCost[uniqIds[0]] ?? '')
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [open, mode, initialTreatment, focusServiceId])
 
   const servicesById = useMemo(() => {
     const map = new Map()
@@ -401,45 +482,74 @@ const handleToothClick = (toothId) => {
     if (!sid) return
     setTeethByServiceId((prev) => ({ ...prev, [sid]: [] }))
   }
+const toothNum = (id) => {
+  const n = Number(String(id ?? '').replace(/^_/, ''))
+  return Number.isFinite(n) ? n : null
+}
 
-  const handleSave = async () => {
-    if (isSaveDisabled) return
+const handleSave = async () => {
+  if (isSaveDisabled) return
 
-    const items = selectedServiceIds.map((id) => {
-      const sid = Number(id)
-      const rawCost = costById[sid] ?? costById[String(sid)]
-      const t = teethByServiceId?.[sid] || []
-      return {
-        service_id: sid,
-        service_date: newRecordDate, // ✅ agrega esto
-        total_cost: parseMoney(rawCost),
-        teeth_ids: t,
-        quantity: t.length,
-      }
-    })
+  const isEditingGroup =
+    mode === 'edit' && (Boolean(initialTreatment?.isGroup) || selectedServiceIds.length > 1)
 
+  const items = selectedServiceIds.map((id) => {
+    const sid = Number(id)
+    const rawCost = costById[sid] ?? costById[String(sid)]
+    const tSvg = teethByServiceId?.[sid] || []
+    const tNums = tSvg.map(toothNum).filter((n) => n != null)
 
-    // ✅ opcional: unión (por compat/back)
-    const unionTeeth = allTeethIds
+    return {
+      treatment_id: treatmentIdByServiceId?.[sid] ?? null,
+      service_id: sid,
+      total_cost: parseMoney(rawCost),
+      teeth_ids: tNums,
+      quantity: tNums.length,
 
-    if (items.length > 1) {
-      await handleSaveRecord?.({
-        title: String(groupTitle || '').trim(),
-        start_date: newRecordDate,
-        teeth_ids: unionTeeth, // compat: si tu backend lo usa para el grupo
-        items,
-      })
-      return
+      // ✅ SOLO single/create usan service_date
+      ...(isEditingGroup ? {} : { service_date: newRecordDate }),
     }
+  })
 
-    await handleSaveRecord?.({
-      service_id: items[0].service_id,
-      service_date: newRecordDate,
-      total_cost: items[0].total_cost,
-      quantity: items[0].quantity,
-      teeth_ids: items[0].teeth_ids,
+  const unionNums = allTeethIds.map(toothNum).filter((n) => n != null)
+  const isGroupNow = items.length > 1
+
+  if (mode === 'edit') {
+    await handleUpdateRecord?.({
+      isGroup: isGroupNow,
+      group_id: initialTreatment?.group_id ?? null,
+      title: String(groupTitle || '').trim(),
+
+      // ✅ esta fecha es la del grupo
+      group_start_date: newRecordDate, // YYYY-MM-DD desde el picker
+
+      group_teeth_ids: unionNums,
+      items,
+      single_treatment_id: !isGroupNow ? (items?.[0]?.treatment_id ?? null) : null,
     })
+    return
   }
+
+  // CREATE (tu lógica original)
+  if (isGroupNow) {
+    await handleSaveRecord?.({
+      title: String(groupTitle || '').trim(),
+      group_start_date: newRecordDate,
+      group_teeth_ids: unionNums,
+      items,
+    })
+    return
+  }
+
+  await handleSaveRecord?.({
+    service_id: items[0].service_id,
+    service_date: newRecordDate,
+    total_cost: items[0].total_cost,
+    quantity: items[0].quantity,
+    teeth_ids: items[0].teeth_ids,
+  })
+}
+
 
   const handlePickerChange = (value) => {
     const ids = normalizeIdsFromPicker(value)
@@ -452,6 +562,24 @@ const handleToothClick = (toothId) => {
     () => teethPrettyFromIds(currentTeethIds),
     [currentTeethIds]
   )
+
+  const sameArray = (a = [], b = []) =>
+  a.length === b.length && a.every((v, i) => v === b[i])
+
+const normalizeIds = (arr) => {
+  const a = Array.isArray(arr) ? arr : []
+  // normaliza + quita duplicados + ordena (evita “cambios” falsos)
+  return Array.from(new Set(a)).sort()
+}
+
+// dentro del componente:
+const onSelectedTeethChange = React.useCallback((next) => {
+  const normalized = normalizeIds(next)
+  setSelectedTeeth((prev) => {
+    const prevNorm = normalizeIds(prev)
+    return sameArray(prevNorm, normalized) ? prev : normalized
+  })
+}, [])
 
   return (
     <>
@@ -466,11 +594,7 @@ const handleToothClick = (toothId) => {
             <div className="shrink-0 self-start md:sticky md:top-2 space-y-3">
               <DiagramaTratamientos
                 src="/tratamientos/diagrama.svg"
-                // ✅ muestra la unión como "seleccionados"
-                activeIds={allTeethIds}
-                // ✅ resalta los del tratamiento activo
                 currentIds={currentTeethIds}
-                // ✅ modo manual: el parent decide el toggle por tratamiento
                 manual
                 onToothClick={handleToothClick}
               />
@@ -529,7 +653,7 @@ const handleToothClick = (toothId) => {
             <div className="space-y-5">
               <div className="space-y-2">
                 <Label className="font-medium mr-4">Fecha de inicio:</Label>
-                <StartDatePicker value={newRecordDate} onChange={setNewRecordDate} />
+                <StartDatePicker value={newRecordDate} onChange={setNewRecordDate} allowManual />
               </div>
 
               {isGroup ? (
@@ -589,7 +713,11 @@ const handleToothClick = (toothId) => {
                             <div className="flex items-center gap-2 min-w-0">
                               <button
                                 type="button"
-                                onClick={() => handleRemoveService(sid)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (mode === 'edit') return
+                                  handleRemoveService(sid)
+                                }}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
                                 aria-label="Quitar"
                               >
@@ -657,16 +785,18 @@ const handleToothClick = (toothId) => {
                 </div>
 
                 <div className="mt-5">
+                  {mode !== 'edit' ? (
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setPickerOpen(true)}
+                   onClick={() => setPickerOpen(true)}
                     disabled={loading || Boolean(error)}
                     className="gap-2 rounded-full px-6 w-full md:w-auto hover:scale-[1.02] transition-transform"
                   >
                     <Plus className="h-4 w-4" />
                     Agregar nuevo
                   </Button>
+                  ) : null}
 
                   {error ? (
                     <div className="mt-2 text-xs text-destructive">
@@ -708,12 +838,14 @@ const handleToothClick = (toothId) => {
         </DialogContent>
       </Dialog>
 
-      <ServicesPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        selectedIds={selectedServiceIds}
-        onChange={handlePickerChange}
-      />
+      {mode !== 'edit' ? (
+        <ServicesPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          selectedIds={selectedServiceIds}
+          onChange={handlePickerChange}
+        />
+      ) : null}
     </>
   )
 }

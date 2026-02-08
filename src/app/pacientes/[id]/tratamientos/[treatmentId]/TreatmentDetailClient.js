@@ -1,25 +1,8 @@
 'use client'
-
 import React, { useEffect, useMemo, useState } from 'react'
-
-// shadcn/ui
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-
-// icons
 import {
-  Check,
-  FileText,
-  Loader2,
-  Mail,
-  Pencil,
-  Trash2,
-  X,
-  NotebookPen,
   History,
   Pen,
   CopyCheck,
@@ -27,24 +10,21 @@ import {
 
 import UploadFilesModal from '@/components/UploadFilesModal'
 import FilePreviewModal from '@/components/FilePreviewModal'
-import TreatmentDetailEvidences from '@/components/TreatmentDetailEvidences'
 import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
 import TreatmentHistoryDrawer from '@/components/TreatmentHistoryDrawer'
 import UpdateStatusModal from '@/components/UpdateStatusModal'
-
 import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocuments'
-import useEmailDocuments from '../../../../../../lib/hooks/useEmailDocuments'
-import { formatDate } from '../../../../../../lib/utils/formatDate'
 import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
 import TreatmentsMenu from '@/components/tratamientos/TreatmentsMenu'
 import { Box } from '@mui/material'
 import formatearFechaHora from '../../../../../../lib/utils/dateFormate'
-
-// ⚠️ Ajusta el path si tu archivo está en otra carpeta
 import TreatmentEvidenceCard from '@/components/TreatmentEvidenceCard'
 import useTreatmentStatusModal from '../../../../../../lib/hooks/useTreatmentStatusModal'
-// Ejemplo alternativo:
-// import TreatmentEvidenceCard from '@/components/tratamientos/TreatmentEvidenceCard'
+import ModalServicio from '@/components/ModalServicio'
+import api from '../../../../../../lib/api'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { CheckCircle2, X } from 'lucide-react'
+
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
@@ -85,177 +65,131 @@ const normalizeTeethIds = (v) => {
   return []
 }
 
-// ✅ detalle para 1 tratamiento (docs + evidencias existentes)
-function TreatmentDetailItem({
-  paciente,
-  initialTratamiento,
-  onCostSaved,
-  onQuantitySaved,
-}) {
-  const [tratamiento, setTratamiento] = useState(initialTratamiento)
-
-  const [isEditingCost, setIsEditingCost] = useState(false)
-  const [editableCost, setEditableCost] = useState(
-    initialTratamiento?.total_cost ?? 0
-  )
-
-  // ✅ cantidad (si la sigues usando)
-  const [isEditingQty, setIsEditingQty] = useState(false)
-  const [editableQty, setEditableQty] = useState(
-    initialTratamiento?.quantity ?? 1
-  )
-
-  const treatmentId = tratamiento?.treatment_id ?? tratamiento?.id
-
-  // ✅ Documentos (hook)
-  const {
-    documents = [],
-    loading,
-    error,
-    isUpdating,
-    fetchDocuments,
-    createDocument,
-    deleteDocument,
-    updateCost,
-    updateQuantity,
-  } = useTreatmentDocuments(paciente.id, treatmentId)
-
-  // Email (hook)
-  const { alert: emailAlert, loadingLabels, sendDocuments, closeAlert } =
-    useEmailDocuments()
-
-  // UI subida docs
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedDocType, setSelectedType] = useState('')
-  const [newDate, setNewDate] = useState('')
-  const [newFiles, setNewFiles] = useState([])
-  const [previewFile, setPreviewFile] = useState(null)
-
-  const teethIds = useMemo(() => {
-    return normalizeTeethIds(tratamiento?.teethIds ?? tratamiento?.teeth_ids)
-  }, [tratamiento?.teethIds, tratamiento?.teeth_ids])
-
-  // sync interno
-  useEffect(() => {
-    setTratamiento(initialTratamiento)
-    setEditableCost(initialTratamiento?.total_cost ?? 0)
-    setEditableQty(initialTratamiento?.quantity ?? 1)
-  }, [initialTratamiento])
-
-  const selectedDocLabel = useMemo(() => {
-    return DOCUMENT_TYPES.find((d) => d.type === selectedDocType)?.label || ''
-  }, [selectedDocType])
-
-  const money = useMemo(() => {
-    try {
-      return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-      }).format(Number(tratamiento?.total_cost ?? 0))
-    } catch {
-      return `${tratamiento?.total_cost ?? 0}`
-    }
-  }, [tratamiento?.total_cost])
-
-  const handleCloseModal = async () => {
-    setIsModalOpen(false)
-    setSelectedType('')
-    setNewDate('')
-    setNewFiles([])
-    await fetchDocuments()
-  }
-
-  const handleSaveDocument = async () => {
-    if (!newDate || newFiles.length === 0) {
-      window.alert('Fecha y archivos obligatorios')
-      return
-    }
-
-    const fd = new FormData()
-    fd.append('created_at', newDate)
-    fd.append('document_type', selectedDocType)
-    newFiles.forEach((f) => fd.append('file', f))
-
-    await createDocument(fd)
-    await handleCloseModal()
-  }
-
-  return (
-    <div className="space-y-4">
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando documentos…
-        </div>
-      ) : null}
-
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{String(error)}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      {/* Modales docs */}
-      <UploadFilesModal
-        open={isModalOpen}
-        onClose={handleCloseModal}
-        title={`Subir ${selectedDocLabel || selectedDocType}`}
-        newRecordDate={newDate}
-        setNewRecordDate={setNewDate}
-        setNewRecordFiles={setNewFiles}
-        handleSaveRecord={handleSaveDocument}
-      />
-
-      <FilePreviewModal
-        open={Boolean(previewFile)}
-        onClose={() => setPreviewFile(null)}
-        file={previewFile}
-      />
-
-      {/* Alerts email */}
-      {emailAlert?.open ? (
-        <div className="fixed bottom-6 right-6 z-50 w-[320px]">
-          <Alert
-            variant={emailAlert.severity === 'error' ? 'destructive' : 'default'}
-          >
-            <AlertTitle>
-              {emailAlert.severity === 'error' ? 'Error' : 'Listo'}
-            </AlertTitle>
-            <AlertDescription className="flex items-center justify-between gap-3">
-              <span>{emailAlert.message}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={closeAlert}
-                aria-label="Cerrar"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [paymentsOpen, setPaymentsOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+
+  const [editDate, setEditDate] = useState('')
+  const [editSelectedService, setEditSelectedService] = useState('')
+  const [editInitialCost, setEditInitialCost] = useState('')
+  const [editTeethIds, setEditTeethIds] = useState([])
+  const [editInitialData, setEditInitialData] = useState(null)
+  const [editScope, setEditScope] = useState('single')
+  const [successAlert, setSuccessAlert] = useState({
+  open: false,
+  title: '',
+  description: '',
+})
+
+
+const openEditModal = (scope = 'single') => {
+  if (!selectedTreatment) return
+
+  setEditScope(scope)
+
+  // ✅ GROUP solo si many Y scope === 'group'
+  if (many && scope === 'group') {
+    const items = (treatmentsState || []).map((it) => ({
+      treatment_id: it.treatment_id ?? it.id,
+      service_id: it.service_id,
+      total_cost: it.total_cost,
+      service_date: it.service_date,
+      teeth_ids: it.teeth_ids ?? [],
+      quantity: it.quantity ?? 0,
+      status: it.status ?? 'Por Iniciar',
+      notes: it.notes ?? null,
+    }))
+
+    setEditInitialData({
+      mode: 'group',
+      title: card?.title || 'Paquete de tratamientos',
+      start_date: treatmentsState?.[0]?.group_start_date || items?.[0]?.service_date || '',
+      items,
+    })
+
+    setEditDate(treatmentsState?.[0]?.group_start_date || '')
+    setEditOpen(true)
+    return
+  }
+
+  // ✅ SINGLE
+  const tid = selectedTreatment?.treatment_id ?? selectedTreatment?.id
+  setEditInitialData({
+    mode: 'single',
+    treatment_id: tid,
+    service_id: selectedTreatment?.service_id,
+    service_date: selectedTreatment?.service_date,
+    total_cost: selectedTreatment?.total_cost,
+    teeth_ids: selectedTreatment?.teeth_ids ?? [],
+    quantity: selectedTreatment?.quantity ?? 0,
+    status: selectedTreatment?.status ?? 'Por Iniciar',
+    notes: selectedTreatment?.notes ?? null,
+  })
+
+  setEditDate(selectedTreatment?.service_date || '')
+  setEditSelectedService(String(selectedTreatment?.service_id || ''))
+  setEditInitialCost(String(selectedTreatment?.total_cost ?? ''))
+  setEditTeethIds(selectedTreatment?.teeth_ids ?? [])
+  setEditOpen(true)
+}
+
+const showSuccess = (title, description) => {
+  setSuccessAlert({ open: true, title, description })
+
+  // auto-hide
+  window.clearTimeout(showSuccess._t)
+  showSuccess._t = window.setTimeout(() => {
+    setSuccessAlert((s) => ({ ...s, open: false }))
+  }, 3500)
+}
+
+const closeEditModal = () => {
+  setEditOpen(false)
+  setEditInitialData(null)
+}
 
   const [treatmentsState, setTreatmentsState] = useState(() =>
     Array.isArray(tratamientos) ? tratamientos : []
   )
 
-   const { openFor, modalProps } = useTreatmentStatusModal({
+const { openFor, modalProps } = useTreatmentStatusModal({
   patientId: paciente?.id,
-  onAfterSave: async ({ newStatus }) => {
-    setTreatmentsState((prev) =>
-      prev.map((t) => ({ ...t, status: newStatus }))
-    )
+  onAfterSave: async ({ target, newStatus }) => {
+    // ✅ update local inmediato (optimista)
+    setTreatmentsState((prev) => {
+      const isGroup = Boolean(target?.isGroup)
+
+      if (isGroup) {
+        const ids = new Set(
+          (target?.items || [])
+            .map((x) => Number(x?.treatment_id ?? x?.id))
+            .filter(Boolean)
+        )
+
+        return prev.map((t) => {
+          const tid = Number(t?.treatment_id ?? t?.id)
+          if (!ids.has(tid)) return t
+          return { ...t, status: newStatus, group_status: newStatus }
+        })
+      }
+
+      const tid = Number(target?.treatment_id ?? target?.id)
+      return prev.map((t) => {
+        const id = Number(t?.treatment_id ?? t?.id)
+        if (id !== tid) return t
+        return { ...t, status: newStatus }
+      })
+    })
+
+    // ✅ esto asegura que si el back recalculó group_status, lo veas ya
+    await refreshCurrentTreatments()
+
     bumpEvents?.()
+    showSuccess?.("Estatus actualizado", `Nuevo estatus: ${newStatus}`)
   },
 })
+
 
   // ✅ init selected seguro
   const [selected, setSelected] = useState(() => {
@@ -328,42 +262,87 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
     bumpEvents()
   }
 
-  const onQuantitySaved = (treatmentId, newQty) => {
-    setTreatmentsState((prev) =>
-      prev.map((t) => {
-        const tid = t?.treatment_id ?? t?.id
-        if (Number(tid) !== Number(treatmentId)) return t
-        return { ...t, quantity: Number(newQty) }
-      })
-    )
-    bumpEvents()
+
+const refreshCurrentTreatments = async () => {
+  if (!paciente?.id) return
+
+  const { data } = await api.get(`/pacientes/${paciente.id}/tratamientos`)
+  const all = Array.isArray(data) ? data : []
+
+  // si estás viendo un grupo, vuelve a setear solo ese grupo
+  const currentGroupId =
+    Number(selectedTreatment?.group_id ?? card?.group_id ?? 0) || null
+
+  if (currentGroupId) {
+    setTreatmentsState(all.filter((t) => Number(t.group_id) === currentGroupId))
+    return
   }
 
-  const card = useMemo(() => {
-    const one = treatmentsState[0]
-    if (!many) {
-      return one
-        ? {
-            isGroup: false,
-            treatment_id: one?.treatment_id ?? one?.id,
-            service_name: one?.service_name,
-            service_date: one?.service_date,
-            total_cost: one?.total_cost,
-            group_id: one?.group_id ?? null,
-          }
-        : null
-    }
+  // si es single, deja solo el treatment seleccionado
+  const tid = Number(selectedTreatmentId ?? 0) || null
+  if (tid) {
+    setTreatmentsState(
+      all.filter((t) => Number(t?.treatment_id ?? t?.id) === tid)
+    )
+    return
+  }
 
-    return {
-      isGroup: true,
-      title: 'Paquete de tratamientos',
-      group_id:
-        Number(treatmentsState?.[0]?.group_id) ||
-        Number(treatmentsState?.[0]?.groupId) ||
-        null,
-      items: treatmentsState,
-    }
-  }, [many, treatmentsState])
+  setTreatmentsState(all)
+}
+
+const normalizeStatusLocal = (raw) => {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (!v) return 'Por Iniciar'
+  if (v === 'terminado') return 'Terminado'
+  if (v === 'en proceso') return 'En proceso'
+  if (v === 'por iniciar') return 'Por Iniciar'
+  return 'Por Iniciar'
+}
+
+const derivedGroupStatus = useMemo(() => {
+  const statuses = (treatmentsState || [])
+    .map((t) => normalizeStatusLocal(t?.status))
+    .filter(Boolean)
+
+  if (!statuses.length) return 'Por Iniciar'
+  const allDone = statuses.every((s) => s === 'Terminado')
+  const anyInProgress = statuses.some((s) => s === 'En proceso')
+  return allDone ? 'Terminado' : anyInProgress ? 'En proceso' : 'Por Iniciar'
+}, [treatmentsState])
+
+
+
+
+  const card = useMemo(() => {
+  const one = treatmentsState[0]
+
+  if (!many) {
+    return one
+      ? {
+          isGroup: false,
+          treatment_id: one?.treatment_id ?? one?.id,
+          service_name: one?.service_name,
+          service_date: one?.service_date,
+          total_cost: one?.total_cost,
+          group_id: one?.group_id ?? null,
+          status: normalizeStatusLocal(one?.status), // ✅
+          group_status: normalizeStatusLocal(one?.group_status), // opcional
+        }
+      : null
+  }
+
+  const first = treatmentsState?.[0] || {}
+  return {
+    isGroup: true,
+    title: first?.group_title || 'Paquete de tratamientos',
+    group_id: Number(first?.group_id ?? null) || null,
+    group_start_date: first?.group_start_date ?? first?.service_date ?? null,
+    items: treatmentsState,
+    status: derivedGroupStatus,
+    group_status: derivedGroupStatus,
+  }
+}, [many, treatmentsState, derivedGroupStatus])
+
 
   const TotalAndHistoryButtons = (
     <div className="mt-6 flex items-center gap-2">
@@ -386,8 +365,12 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
         type="button"
         variant="outline"
         size="icon"
-        onClick={() => setHistoryOpen(true)}
-        title="Historial"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          openEditModal('single')
+        }}
+        title="Editar tratamiento"
         className="rounded-xl"
       >
         <Pen />
@@ -421,10 +404,138 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
   const selectedTreatmentId =
   selectedTreatment?.treatment_id ?? selectedTreatment?.id ?? null
 
-const {
-  updateCost: updateSelectedCost,
-  isUpdating: isUpdatingSelectedCost,
-} = useTreatmentDocuments(paciente?.id, selectedTreatmentId)
+  const {
+    updateCost: updateSelectedCost,
+    isUpdating: isUpdatingSelectedCost,
+  } = useTreatmentDocuments(paciente?.id, selectedTreatmentId)
+
+  const sameArray = (a = [], b = []) =>
+  a.length === b.length && a.every((v, i) => v === b[i])
+
+const normalizeIds = (arr) => {
+  const a = Array.isArray(arr) ? arr : []
+  // normaliza + quita duplicados + ordena (evita “cambios” falsos)
+  return Array.from(new Set(a)).sort()
+}
+
+// dentro del componente:
+const onSelectedTeethChange = React.useCallback((next) => {
+  const normalized = normalizeIds(next)
+  setSelectedTeeth((prev) => {
+    const prevNorm = normalizeIds(prev)
+    return sameArray(prevNorm, normalized) ? prev : normalized
+  })
+}, [])
+
+const cleanUndefined = (obj) =>
+  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))
+
+const ymdToIsoLocalMidnight = (ymd) => {
+  if (!ymd) return ymd
+  if (String(ymd).includes('T')) return ymd
+  const d = new Date(`${ymd}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? ymd : d.toISOString()
+}
+
+const handleUpdateRecord = async (payload) => {
+  try {
+    const isGroup =
+      Boolean(payload?.isGroup) ||
+      Boolean(payload?.group_id) ||
+      (payload?.items?.length > 1)
+
+    // ✅ GROUP
+    if (isGroup) {
+      const groupStartIso = ymdToIsoLocalMidnight(
+        payload?.group_start_date ?? payload?.start_date
+      )
+      const groupTitle = payload?.title ?? null
+      const groupTeeth = payload?.group_teeth_ids ?? null
+
+      await Promise.all(
+        (payload.items || []).map((it) =>
+          api.patch(
+            `/pacientes/${paciente.id}/tratamientos/${it.treatment_id}`,
+            cleanUndefined({
+              group_start_date: groupStartIso,
+              ...(groupTitle ? { group_title: groupTitle } : {}),
+              ...(groupTeeth ? { group_teeth_ids: groupTeeth } : {}),
+
+              total_cost: it.total_cost,
+              quantity: it.quantity ?? 0,
+              teeth_ids: it.teeth_ids ?? [],
+              notes: it.notes ?? null,
+            })
+          )
+        )
+      )
+
+      await refreshCurrentTreatments()
+      showSuccess(
+        'Tratamiento actualizado correctamente',
+        'Los cambios se guardaron y se reflejan inmediatamente.'
+      )
+
+      closeEditModal()
+      bumpEvents?.()
+      return true
+
+    }
+
+    // ✅ SINGLE: tomar datos desde items[0]
+    const it = payload?.items?.[0] ?? {}
+    const tid =
+      payload?.single_treatment_id ??
+      payload?.treatment_id ??
+      it?.treatment_id ??
+      editInitialData?.treatment_id
+
+    const serviceDateIso = ymdToIsoLocalMidnight(
+      payload?.service_date ?? it?.service_date
+    )
+
+    await api.patch(
+      `/pacientes/${paciente.id}/tratamientos/${tid}`,
+      cleanUndefined({
+        service_id: payload?.service_id ?? it?.service_id,
+        service_date: serviceDateIso,
+        total_cost: payload?.total_cost ?? it?.total_cost,
+        quantity: payload?.quantity ?? it?.quantity ?? 0,
+        teeth_ids: payload?.teeth_ids ?? it?.teeth_ids ?? [],
+        notes: payload?.notes ?? it?.notes,
+      })
+    )
+    await refreshCurrentTreatments()
+
+    showSuccess(
+      'Paquete actualizado correctamente',
+      'Los cambios se guardaron y se reflejan inmediatamente.'
+    )
+
+    closeEditModal()
+    bumpEvents?.()
+    return true
+  } catch (e) {
+    console.error(e)
+    return false
+  }
+}
+
+const modalInitialTreatment = useMemo(() => {
+  if (many && editScope === 'group') {
+    const first = treatmentsState?.[0] || {}
+    return {
+      isGroup: true,
+      group_id: Number(first?.group_id ?? card?.group_id ?? null) || null,
+      group_title: first?.group_title || null,
+      group_start_date: first?.group_start_date ?? null,
+      title: first?.group_title || card?.title || 'Paquete de tratamientos',
+      items: treatmentsState,
+    }
+  }
+  // ✅ editar SOLO el seleccionado
+  return selectedTreatment
+}, [many, editScope, treatmentsState, selectedTreatment, card?.title, card?.group_id])
 
 
   return (
@@ -474,7 +585,10 @@ const {
             showMeta
           />
 
-          <DiagramaTratamientos />
+          <DiagramaTratamientos 
+          activeIds={selectedTeeth}
+          onActiveIdsChange={setSelectedTeeth}
+          />
         </Box>
 
         {/* Derecha 80% */}
@@ -490,24 +604,19 @@ const {
             <div className="space-y-3">
               <TreatmentEvidenceCard
                 title={selectedTreatment?.service_name || 'Tratamiento'}
+                date={treatmentsState?.[0]?.group_start_date}
                 relatedTeeth={relatedTeeth}
                 cost={Number(selectedTreatment?.total_cost || 0)}
                 teeth={relatedTeeth}
                 teethOptions={relatedTeeth.map((n) => ({ id: n, label: String(n) }))}
-
                 selectedTeeth={selectedTeeth}
                 onSelectedTeethChange={setSelectedTeeth}
-
                 comment={comment}
                 onCommentChange={setComment}
-
                 files={files}
                 onFilesChange={setFiles}
-
                 avatarUrl="/perfil.png"
                 avatarInitials="IE"
-
-                // ✅ NUEVO: guardar costo desde el header
                 costUpdating={isUpdatingSelectedCost}
                 onSaveCost={async (newCost) => {
                   const ok = await updateSelectedCost(newCost)
@@ -517,7 +626,6 @@ const {
                   }
                   return false
                 }}
-
                 onSubmit={({ selectedTeeth, comment, files }) => {
                   console.log('submit evidence', {
                     treatmentId: selectedTreatmentId,
@@ -526,13 +634,6 @@ const {
                     files,
                   })
                 }}
-              />
-              <TreatmentDetailItem
-                key={selectedTreatment?.treatment_id ?? selectedTreatment?.id}
-                paciente={paciente}
-                initialTratamiento={selectedTreatment}
-                onCostSaved={onCostSaved}
-                onQuantitySaved={onQuantitySaved}
               />
             </div>
           ) : (
@@ -560,6 +661,54 @@ const {
       />
 
       <UpdateStatusModal {...modalProps} />
+
+      <ModalServicio
+        open={editOpen}
+        onClose={closeEditModal}
+        title={many && editScope === 'group' ? 'Editar paquete' : 'Editar tratamiento'}
+        newRecordDate={editDate}
+        setNewRecordDate={setEditDate}
+        selectedService={editSelectedService}
+        setSelectedService={setEditSelectedService}
+        initialCost={editInitialCost}
+        setInitialCost={setEditInitialCost}
+        teethIds={editTeethIds}
+        setTeethIds={setEditTeethIds}
+        mode="edit"
+        initialTreatment={modalInitialTreatment}
+        focusServiceId={selectedTreatment?.service_id}
+        handleUpdateRecord={handleUpdateRecord}
+      />
+
+      {successAlert.open ? (
+        <Alert
+          className={cx(
+            'border-emerald-200 bg-emerald-50 text-emerald-950',
+            'flex items-start gap-3'
+          )}
+        >
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
+          <div className="flex-1">
+            <AlertTitle className="text-emerald-900">
+              {successAlert.title}
+            </AlertTitle>
+            <AlertDescription className="text-emerald-800">
+              {successAlert.description}
+            </AlertDescription>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSuccessAlert((s) => ({ ...s, open: false }))}
+            className="rounded-md p-1 hover:bg-emerald-100 transition"
+            aria-label="Cerrar"
+            title="Cerrar"
+          >
+            <X className="h-4 w-4 text-emerald-700" />
+          </button>
+        </Alert>
+      ) : null}
+
 
     </div>
   )

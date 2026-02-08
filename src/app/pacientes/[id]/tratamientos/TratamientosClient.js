@@ -537,80 +537,36 @@ export default function TratamientosClient({ paciente }) {
                 )
               }
         {filteredCards.map((card) => {
-          const key = card.isGroup ? `group-${card.group_id}` : `t-${card.treatment_id}`
+  const key = card.isGroup ? `group-${card.group_id}` : `t-${card.treatment_id}`
 
-          return (
-            <>
-            <div key={key} className="relative min-w-0 mb-3 pl-4">
-              { filteredCards.length > 1 && (
-                  <span
-                    aria-hidden="true"
-                    className={cx(
-                      'absolute -inset-0 top-5 -translate-x-1/2',
-                      'h-3 w-3 rounded-full border',
-                      'ring-background',
-                      timelineDotClasses(card)
-                    )}
-                  />
-                )
-              }
+  return (
+    <div key={key} className="relative min-w-0 mb-3 pl-4">
+      {filteredCards.length > 1 && (
+        <span
+          aria-hidden="true"
+          className={cx(
+            'absolute -inset-0 top-5 -translate-x-1/2',
+            'h-3 w-3 rounded-full border',
+            'ring-background',
+            timelineDotClasses(card)
+          )}
+        />
+      )}
 
-              {/* Dropdown de acciones (por card) */}
-              <div className="absolute right-2 top-2 z-10">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 bg-background/80 backdrop-blur rounded-lg"
-                      aria-label="Acciones"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+      {/* Dropdown */}
+      <div className="absolute right-2 top-2 z-10">
+        ...
+      </div>
 
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openFor(card)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Cambiar estatus
-                    </DropdownMenuItem>
+      <TreatmentCard
+        treatment={card}
+        onClick={() => handleCardClick(card)}
+        onStatusClick={() => openFor(card)}
+      />
+    </div>
+  )
+})}
 
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        openPayments(card)
-                      }}
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Ver pagos
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => {
-                        setRecordToDelete(card)
-                        setIsDeleteModalOpen(true)
-                      }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar {card.isGroup ? 'paquete' : 'tratamiento'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <TreatmentCard
-                treatment={card}
-                onClick={() => handleCardClick(card)}
-                onStatusClick={openFor}
-              />
-            </div>
-            </>
-          )
-        })}
       </div>
     </div>
       </div>

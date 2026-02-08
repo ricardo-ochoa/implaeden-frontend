@@ -10,10 +10,16 @@ import TeethMultiSelect from './TeethMultiSelect'
 import CommentInput from './CommentInput'
 import TreatmentHeader from './tratamientos/TreatmentHeader'
 import EvidencePicker from './tratamientos/EvidencePicker'
+import ModalServicio from '@/components/ModalServicio'
+import api from '../../lib/api'
+
 
 const cx = (...c) => c.filter(Boolean).join(' ')
 
 export default function TreatmentEvidenceCard({
+   patientId,
+   treatment,
+   date,
   title,
   relatedTeeth = [],
   cost = 0,
@@ -42,6 +48,12 @@ export default function TreatmentEvidenceCard({
   const [localComment, setLocalComment] = React.useState('')
   const [localFiles, setLocalFiles] = React.useState([])
 
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [editDate, setEditDate] = React.useState('')
+  const [selectedService, setSelectedService] = React.useState('')
+  const [initialCost, setInitialCost] = React.useState('')
+  const [unionTeethIds, setUnionTeethIds] = React.useState([])
+
   const teethValue = selectedTeeth ?? localTeeth
   const commentValue = comment ?? localComment
   const filesValue = files ?? localFiles
@@ -67,18 +79,67 @@ export default function TreatmentEvidenceCard({
     })
   }
 
+const ymdToIsoLocalMidnight = (ymd) => {
+  if (!ymd) return ymd
+  if (String(ymd).includes('T')) return ymd
+  const d = new Date(`${ymd}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? ymd : d.toISOString()
+}
+
+const handleUpdateRecord = async (payload) => {
+  try {
+    if (!patientId) throw new Error('patientId requerido')
+
+    const isGroup = Boolean(payload?.isGroup) || Boolean(payload?.group_id)
+    const ymd = payload?.group_start_date ?? payload?.start_date ?? payload?.service_date
+    const groupStartIso = ymdToIsoLocalMidnight(ymd)
+
+    if (isGroup) {
+      const updates = (payload.items || [])
+        .filter((it) => it?.treatment_id)
+        .map((it) =>
+          api.patch(`/pacientes/${patientId}/tratamientos/${it.treatment_id}`, {
+            group_start_date: groupStartIso,     // ✅ correcto
+            total_cost: it.total_cost,
+            quantity: it.quantity,
+            teeth_ids: it.teeth_ids,
+          })
+        )
+
+      await Promise.all(updates)
+    } else {
+      const tid = payload?.single_treatment_id || payload?.items?.[0]?.treatment_id
+      if (!tid) throw new Error('treatment_id requerido')
+
+      const it = payload.items?.[0] || {}
+      await api.patch(`/pacientes/${patientId}/tratamientos/${tid}`, {
+        service_date: payload.service_date ?? payload.start_date, // ✅ single
+        total_cost: it.total_cost,
+        quantity: it.quantity,
+        teeth_ids: it.teeth_ids,
+      })
+    }
+
+    setEditOpen(false)
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+
+
   return (
+    <>
     <Card className={cx('rounded-t-2xl rounded-b-none shadow-none', className)}>
       <CardContent className="p-5">
        <TreatmentHeader
           title={title}
           relatedTeeth={relatedTeeth}
           cost={cost}
-
-          // ✅ NUEVO
           editable={true}
           isUpdating={costUpdating}
           onSaveCost={onSaveCost}
+          onEdit={() => setEditOpen(true)}
         />
 
         {/* Dientes seleccionados */}
@@ -135,5 +196,23 @@ export default function TreatmentEvidenceCard({
         </div>
       </CardContent>
     </Card>
+      <ModalServicio
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Editar tratamiento"
+        newRecordDate={editDate}
+        setNewRecordDate={setEditDate}
+        selectedService={selectedService}
+        setSelectedService={setSelectedService}
+        initialCost={initialCost}
+        setInitialCost={setInitialCost}
+        savedDate={date}
+        teethIds={unionTeethIds}
+        setTeethIds={setUnionTeethIds}
+        mode="edit"
+        initialTreatment={treatment}
+        handleUpdateRecord={handleUpdateRecord}
+      />
+    </>
   )
 }
