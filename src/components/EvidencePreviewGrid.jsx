@@ -115,36 +115,44 @@ export default function EvidencePreviewGrid({
       </div>
 
       {/* Modal preview */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="truncate">
-              {active?.file?.name || 'Vista previa'}
-            </DialogTitle>
-            {active?.file ? (
-              <p className="text-xs text-muted-foreground">
-                {active.file.type || '—'} · {formatBytes(active.file.size)}
-              </p>
-            ) : null}
-          </DialogHeader>
+{/* Modal preview */}
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent
+    className="
+      w-fit max-w-[90vw]
+      p-4 sm:p-6
+      overflow-hidden
+    "
+  >
+    <DialogHeader className="max-w-[90vw]">
+      <DialogTitle className="truncate">
+        {active?.file?.name || 'Vista previa'}
+      </DialogTitle>
+      {active?.file ? (
+        <p className="text-xs text-muted-foreground truncate">
+          {active.file.type || '—'} · {formatBytes(active.file.size)}
+        </p>
+      ) : null}
+    </DialogHeader>
 
-          <div className="w-full">
-            {active?.kind === 'video' ? (
-              <video
-                src={active?.url}
-                controls
-                className="w-full max-h-[70vh] rounded-lg bg-black"
-              />
-            ) : (
-              <img
-                src={active?.url}
-                alt={active?.file?.name || 'preview'}
-                className="w-full max-h-[70vh] object-contain rounded-lg bg-black/5"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+    <div className="flex justify-center">
+      {active?.kind === 'video' ? (
+        <video
+          src={active?.url}
+          controls
+          className="w-auto h-auto max-w-[90vw] max-h-[70vh] rounded-lg bg-black"
+        />
+      ) : (
+        <img
+          src={active?.url}
+          alt={active?.file?.name || 'preview'}
+          className="w-auto h-auto max-w-[90vw] max-h-[70vh] object-contain rounded-lg bg-black/5"
+        />
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
+
     </div>
   )
 }

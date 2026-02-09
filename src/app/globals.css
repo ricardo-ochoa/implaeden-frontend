@@ -137,3 +137,16 @@
 .dark .comment-quill .ql-snow .ql-toolbar button.ql-active {
   background: hsl(var(--accent));
 }
+
+/* Solo para el viewer modal */
+[data-viewer-modal] .swiper,
+[data-viewer-modal] .swiper-wrapper,
+[data-viewer-modal] .swiper-slide {
+  height: 100%;
+}
+
+[data-viewer-modal] .swiper-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

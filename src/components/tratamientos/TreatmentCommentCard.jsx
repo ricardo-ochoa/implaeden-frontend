@@ -201,7 +201,7 @@ export default function TreatmentCommentCard({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-xl"
+              className="h-6 w-6 rounded-xl"
               title="Opciones"
             >
               <MoreVertical className="h-5 w-5" />
@@ -209,11 +209,11 @@ export default function TreatmentCommentCard({
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
+            {/* <DropdownMenuItem
               onClick={() => onCopy?.(item)}
             >
               Copiar
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
             <DropdownMenuItem
               className="text-red-600 focus:text-red-600"
               onClick={() => onDelete?.(item)}

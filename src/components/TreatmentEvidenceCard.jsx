@@ -75,18 +75,20 @@ export default function TreatmentEvidenceCard({
     !submitting &&
     (String(commentValue || '').trim().length > 0 || (filesValue?.length ?? 0) > 0)
 
+
     const handleSubmit = async () => {
-    if (!canSubmit) return
-    await createComment({
-      commentHtml: commentValue,
-      teethIds: teethValue,
-      files: filesValue,
-    })
-    
-    setComment('')
-    setFiles([])
-    setTeeth([])
-  }
+      if (!canSubmit) return
+
+      await onSubmit?.({
+        selectedTeeth: teethValue,
+        comment: commentValue,
+        files: filesValue,
+      })
+
+      setComment('')
+      setFiles([])
+      setTeeth([])
+    }
 
 const ymdToIsoLocalMidnight = (ymd) => {
   if (!ymd) return ymd
@@ -136,10 +138,8 @@ const handleUpdateRecord = async (payload) => {
 }
 
 const handlePickFiles = (picked) => {
-  // ✅ append + dedupe opcional
   const all = [...(filesValue || []), ...(picked || [])]
-
-  // dedupe por name+size+lastModified (opcional pero recomendado)
+  
   const seen = new Set()
   const deduped = all.filter((f) => {
     const key = `${f.name}-${f.size}-${f.lastModified}`

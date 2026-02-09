@@ -46,7 +46,8 @@ export default function TreatmentCommentsTimeline({
       <div className="relative pl-7">
         {/* línea vertical */}
         <div className="absolute left-2 top-0 bottom-0 w-px bg-border" />
-
+        {
+            sorted.length != 0 ? (
         <div className="space-y-6">
           {sorted.map((it) => {
             const tid = Number(it?.treatment_id)
@@ -81,6 +82,13 @@ export default function TreatmentCommentsTimeline({
             )
           })}
         </div>
+
+            ): (
+                <div className='mt-10 text-sm text-center text-slate-500 font-mono'>No hay comentarios agregados</div>
+            )
+        }
+
+
       </div>
     </div>
   )

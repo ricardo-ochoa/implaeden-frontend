@@ -84,6 +84,9 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
   title: '',
   description: '',
 })
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerItems, setViewerItems] = useState([])
+  const [viewerIndex, setViewerIndex] = useState(0)
 
 const { teethMap, toothOptions: allToothOptions } = useTeethCatalog()
 
@@ -665,6 +668,7 @@ const treatmentsById = useMemo(() => {
                   }
                   return false
                 }}
+                submitting={commentsSaving}
                 onSubmit={async ({ selectedTeeth, comment, files }) => {
                   await createComment({
                     commentHtml: comment,
@@ -690,8 +694,9 @@ const treatmentsById = useMemo(() => {
                   toothOptions={allToothOptions}
                   onDelete={(item) => deleteComment(item.id)}
                   onMediaClick={({ item, media, index }) => {
-                    // aquí conectas FilePreviewModal
-                    console.log('open media', { item, media, index })
+                    setViewerItems(Array.isArray(item?.media) ? item.media : [])
+                    setViewerIndex(Number(index) || 0)
+                    setViewerOpen(true)
                   }}
                 />
               )}
@@ -769,7 +774,13 @@ const treatmentsById = useMemo(() => {
         </Alert>
       ) : null}
 
-
+      <FilePreviewModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        items={viewerItems}
+        startIndex={viewerIndex}
+        onIndexChange={setViewerIndex}
+      />
     </div>
   )
 }

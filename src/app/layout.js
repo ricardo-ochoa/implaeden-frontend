@@ -8,6 +8,9 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import "@assistant-ui/react-ui/styles/index.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import 'swiper/css'
+import 'swiper/css/navigation'
+import 'swiper/css/pagination'
 
 export default function RootLayout({ children }) {
   return (
