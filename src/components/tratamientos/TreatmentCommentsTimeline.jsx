@@ -23,6 +23,10 @@ export default function TreatmentCommentsTimeline({
   onMediaClick,               // ({item, media, index}) => void
   onCopy,
   onDelete,
+  onUpdate,
+  updating = false,
+  avatarUrl,
+  avatarInitials = 'IE',
   className,
 }) {
   const list = Array.isArray(items) ? items : []
@@ -77,6 +81,10 @@ export default function TreatmentCommentsTimeline({
                   onMediaClick={onMediaClick}
                   onCopy={onCopy}
                   onDelete={onDelete}
+                  onUpdate={onUpdate}
+                    updating={updating}
+                    avatarUrl={avatarUrl}
+                    avatarInitials={avatarInitials}
                 />
               </div>
             )

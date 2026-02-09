@@ -87,6 +87,57 @@ export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerItems, setViewerItems] = useState([])
   const [viewerIndex, setViewerIndex] = useState(0)
+  const [commentUpdating, setCommentUpdating] = useState(false)
+
+const updateComment = async ({
+  commentId,
+  commentHtml,
+  teethIds = [],
+  addFiles = [],
+  removeMediaIds = [],
+}) => {
+  const pid = paciente?.id
+  const tid = selectedTreatmentId // (ya lo tienes calculado abajo en tu componente)
+  const cid = commentId
+
+  if (!pid || !tid || !cid) return false
+
+  try {
+    setCommentUpdating(true)
+
+    const fd = new FormData()
+
+    // ✅ Archivos nuevos (DEBEN ser File/Blob)
+    const filesArr = Array.isArray(addFiles) ? addFiles : []
+    filesArr.forEach((f) => {
+      const file = f?.file ?? f // por si tu UI manda {file: File}
+      if (file instanceof File || file instanceof Blob) {
+        fd.append('file', file) // 👈 EXACTO "file" para Multer
+      }
+    })
+
+    // ✅ Campos (solo si vienen)
+    if (commentHtml !== undefined) fd.append('comment_html', String(commentHtml ?? ''))
+    if (teethIds !== undefined) fd.append('teeth_ids', JSON.stringify(teethIds ?? []))
+    if (removeMediaIds !== undefined)
+      fd.append('remove_media_ids', JSON.stringify(removeMediaIds ?? []))
+
+    await api.patch(`/pacientes/${pid}/tratamientos/${tid}/comentarios/${cid}`, fd)
+    // ⚠️ NO pongas headers Content-Type manualmente (axios pone el boundary)
+
+    await fetchComments?.()
+    bumpEvents?.()
+    showSuccess?.('Comentario actualizado', 'Se guardaron los cambios correctamente.')
+    return true
+  } catch (e) {
+    console.error(e)
+    return false
+  } finally {
+    setCommentUpdating(false)
+  }
+}
+
+
 
 const { teethMap, toothOptions: allToothOptions } = useTeethCatalog()
 
@@ -698,6 +749,10 @@ const treatmentsById = useMemo(() => {
                     setViewerIndex(Number(index) || 0)
                     setViewerOpen(true)
                   }}
+                  onUpdate={updateComment}
+                  updating={commentUpdating}
+                  avatarUrl="/perfil.png"
+                  avatarInitials="IE"
                 />
               )}
             </div>
