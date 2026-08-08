@@ -8,6 +8,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        hostname: "files.implaeden.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "implaeden.s3.us-east-2.amazonaws.com",
         pathname: "/**",
       },
