@@ -48,7 +48,14 @@ const pad = (n) => String(n).padStart(2, '0')
 const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const hourFmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '')
 const longFmt = (iso) => (iso ? new Date(iso).toLocaleString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '—')
-const monthLabel = (iso) => new Date(iso).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+// Ancla del mes a partir del ISO, tomando año-mes del TEXTO (no del instante)
+// para evitar corrimientos por zona horaria: '2026-08-01T00:00:00Z' parseado en
+// MX (UTC-6) caería en el 31-jul y mostraría el mes anterior.
+const anchorFromRange = (iso) => {
+  const [y, m] = String(iso).slice(0, 7).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, 1) // fecha local, día 1 del mes
+}
+const monthLabel = (iso) => anchorFromRange(iso).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
 
 // Matriz de 6 semanas (lunes primero) para el mes del ancla.
 function monthGrid(anchor) {
@@ -152,11 +159,11 @@ export default function AgendaClient({ initialAppointments = [], initialFrom, in
     return map
   }, [filtered])
 
-  const { weeks, month } = useMemo(() => monthGrid(new Date(range.from)), [range.from])
+  const { weeks, month } = useMemo(() => monthGrid(anchorFromRange(range.from)), [range.from])
   const todayKey = dayKey(new Date())
 
   const shiftMonth = (delta) => {
-    const base = new Date(range.from)
+    const base = anchorFromRange(range.from)
     const from = new Date(base.getFullYear(), base.getMonth() + delta, 1)
     const to = new Date(base.getFullYear(), base.getMonth() + delta + 1, 0, 23, 59, 59)
     setRange({ from: from.toISOString(), to: to.toISOString() })
