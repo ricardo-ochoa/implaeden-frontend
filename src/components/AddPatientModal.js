@@ -177,15 +177,15 @@ export default function AddPatientModal({ open, onClose, onSave, error }) {
             ) : null}
           </div>
 
-          {/* Fecha nacimiento */}
+          {/* Fecha nacimiento (opcional) */}
           <div className="space-y-1.5">
-            <Label htmlFor="fecha_nacimiento">Fecha de nacimiento</Label>
+            <Label htmlFor="fecha_nacimiento">Fecha de nacimiento <span className="text-muted-foreground font-normal">(opcional)</span></Label>
             <Controller
               name="fecha_nacimiento"
               control={control}
               rules={{
-                required: "La fecha de nacimiento es obligatoria.",
                 validate: (value) => {
+                  if (!value) return true; // opcional
                   const selectedDate = new Date(value);
                   const min = new Date(currentYear - 100, 0, 1);
                   const max = new Date(currentYear - 1, 11, 31);
@@ -211,18 +211,17 @@ export default function AddPatientModal({ open, onClose, onSave, error }) {
             ) : null}
           </div>
 
-          {/* Email */}
+          {/* Email (opcional) */}
           <div className="space-y-1.5">
-            <Label htmlFor="email">Correo electrónico</Label>
+            <Label htmlFor="email">Correo electrónico <span className="text-muted-foreground font-normal">(opcional)</span></Label>
             <Controller
               name="email"
               control={control}
               rules={{
-                required: "El correo electrónico es obligatorio.",
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Ingrese un correo electrónico válido.",
-                },
+                validate: (value) =>
+                  !value ||
+                  /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value) ||
+                  "Ingrese un correo electrónico válido.",
               }}
               render={({ field }) => (
                 <Input
@@ -239,15 +238,13 @@ export default function AddPatientModal({ open, onClose, onSave, error }) {
             ) : null}
           </div>
 
-          {/* Dirección */}
+          {/* Dirección (opcional) */}
           <div className="space-y-1.5">
-            <Label htmlFor="direccion">Dirección</Label>
+            <Label htmlFor="direccion">Dirección <span className="text-muted-foreground font-normal">(opcional)</span></Label>
             <Controller
               name="direccion"
               control={control}
-              rules={{
-                required: "La dirección es obligatoria.",
-              }}
+              rules={{}}
               render={({ field }) => (
                 <Input
                   id="direccion"
