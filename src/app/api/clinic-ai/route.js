@@ -83,7 +83,7 @@ export async function POST(req) {
       rawData = summaryData;
       mode = "patient-summary";
 
-      const { patient, lastService, lastAppointment, lastPayment } = summaryData;
+      const { patient, lastService, lastAppointment, nextAppointment, lastPayment } = summaryData;
 
 
       const contextText = `
@@ -102,6 +102,13 @@ ${
   lastAppointment
     ? `${lastAppointment.service_name} el ${lastAppointment.appointment_at}`
     : "No hay citas registradas"
+}
+
+Próxima cita:
+${
+  nextAppointment
+    ? `${nextAppointment.service_name} el ${nextAppointment.appointment_at}`
+    : "No hay próximas citas"
 }
 
 Último pago:

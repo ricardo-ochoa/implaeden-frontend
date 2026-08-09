@@ -36,7 +36,7 @@ function formatDateTime(dateString) {
 
 function buildSummaryItems(summary) {
   if (!summary) return [];
-  const { patient, lastService, lastAppointment, lastPayment } = summary;
+  const { patient, lastService, lastAppointment, nextAppointment, lastPayment } = summary;
   const items = [];
 
   if (patient) {
@@ -81,6 +81,19 @@ function buildSummaryItems(summary) {
     items.push({ label: "Última cita registrada", value: partes.join(" ") });
   } else {
     items.push({ label: "Última cita registrada", value: "No hay citas registradas." });
+  }
+
+  if (nextAppointment) {
+    const fecha = nextAppointment.appointment_at
+      ? formatDateTime(nextAppointment.appointment_at)
+      : "Sin fecha";
+
+    const partes = [fecha];
+    if (nextAppointment.service_name) partes.push(`para ${nextAppointment.service_name}`);
+
+    items.push({ label: "Próxima cita", value: partes.join(" ") });
+  } else {
+    items.push({ label: "Próxima cita", value: "No hay próximas citas." });
   }
 
   if (lastPayment) {
