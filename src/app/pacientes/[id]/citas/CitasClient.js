@@ -6,34 +6,23 @@ import api, { fetcher } from '../../../../../lib/api'
 
 import CitasTable from '@/components/citas/CitasTable'
 import CitaModal from '@/components/citas/CitaModal'
+import CitaDetailDialog from '@/components/citas/CitaDetailDialog'
 
 // shadcn/ui
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-
-// icon (lucide)
 import { Plus, Loader2 } from 'lucide-react'
 
-// mini helper
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
+// Fase 1: listar (desde Google Calendar) + crear. Editar/eliminar en Fase 2.
 export default function CitasClient({
   paciente,
   patientId,
   initialServicios = [],
   initialCitas = [],
 }) {
-  const pid = Number(
-    patientId ?? paciente?.id ?? paciente?.patient_id ?? paciente?.paciente_id
-  )
+  const pid = Number(patientId ?? paciente?.id ?? paciente?.patient_id ?? paciente?.paciente_id)
 
   if (!pid) {
     return (
@@ -44,192 +33,133 @@ export default function CitasClient({
     )
   }
 
-  // SWR
-  const {
-    data: citas,
-    error: errorCitas,
-    isLoading: loadingCitas,
-    mutate,
-  } = useSWR(pid ? `/pacientes/${pid}/citas` : null, fetcher, {
-    fallbackData: initialCitas,
-  })
+  const { data: citas, error: errorCitas, isLoading: loadingCitas, mutate } = useSWR(
+    `/pacientes/${pid}/citas`,
+    fetcher,
+    { fallbackData: initialCitas }
+  )
 
-  // UI state
   const [servicios] = useState(initialServicios)
   const [modalOpen, setModalOpen] = useState(false)
   const [mensaje, setMensaje] = useState('')
-  const [selectedCita, setSelectedCita] = useState(null)
-
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [citaToDelete, setCitaToDelete] = useState(null)
+  const [selected, setSelected] = useState(null)
 
   const formatearFechaHora = (isoString) => {
     if (!isoString) return 'Fecha no disponible'
     const fecha = new Date(isoString)
     if (isNaN(fecha.getTime())) return 'Fecha inválida'
-    return fecha.toLocaleString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return fecha.toLocaleString('es-MX', {
+      year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   }
 
   const flash = (text) => {
     setMensaje(text)
-    setTimeout(() => setMensaje(''), 3000)
+    setTimeout(() => setMensaje(''), 3500)
   }
 
-  const handleCloseModal = () => {
-    setModalOpen(false)
-    setSelectedCita(null)
-  }
-
-  const handleSave = async (form) => {
-    const { appointment_at, service_id } = form
-    if (!appointment_at || !service_id) {
-      flash('Por favor complete fecha y tratamiento')
-      return false
-    }
-
+  // Recibe el payload ya listo del modal: { start, end, serviceId, observaciones, status }
+  const handleSave = async (payload) => {
     try {
-      const promise = selectedCita
-        ? api.put(`/pacientes/${pid}/citas/${selectedCita.id}`, form)
-      : api.post(`/pacientes/${pid}/citas`, form)
-
-      await promise
+      await api.post(`/pacientes/${pid}/citas`, payload)
       await mutate()
-
-      flash(selectedCita ? 'Cita actualizada exitosamente' : 'Cita creada exitosamente')
-      handleCloseModal()
+      flash('Cita creada exitosamente')
       return true
     } catch (err) {
-      flash('Error guardando la cita')
+      const status = err?.response?.status
+      if (status === 503) flash('Google Calendar no está configurado en el servidor.')
+      else flash('Error guardando la cita')
       return false
     }
   }
 
-  const handleEdit = (cita) => {
-    setSelectedCita(cita)
-    setModalOpen(true)
-  }
-
-  const handleRequestDelete = (id) => {
-    const cita = (citas || []).find((c) => c.id === id)
-    setCitaToDelete(cita || null)
-    setConfirmOpen(true)
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!citaToDelete) return
-
-    try {
-      await api.delete(`/pacientes/${pacienteId}/citas/${citaToDelete.id}`)
-      await mutate()
-      flash('Cita eliminada exitosamente')
-    } catch (err) {
-      flash('Error eliminando la cita')
-    } finally {
-      setConfirmOpen(false)
-      setCitaToDelete(null)
-    }
-  }
+  const list = Array.isArray(citas) ? citas : []
+  const nowTs = Date.now()
+  const upcoming = list
+    .filter((c) => new Date(c.start).getTime() >= nowTs)
+    .sort((a, b) => new Date(a.start) - new Date(b.start)) // más próxima primero
+  const past = list
+    .filter((c) => new Date(c.start).getTime() < nowTs)
+    .sort((a, b) => new Date(b.start) - new Date(a.start)) // más reciente primero
 
   const isSuccess = mensaje.includes('exitosamente')
 
   return (
     <div className="relative">
-      {/* Toast simple (shadcn Alert fijo) */}
       {mensaje ? (
         <div className="fixed top-4 left-1/2 z-50 w-[min(520px,calc(100%-24px))] -translate-x-1/2">
           <Alert className={cx(isSuccess ? 'border-emerald-500/40' : 'border-destructive/40')} variant={isSuccess ? 'default' : 'destructive'}>
-            <AlertTitle>{isSuccess ? 'Listo' : 'Error'}</AlertTitle>
+            <AlertTitle>{isSuccess ? 'Listo' : 'Aviso'}</AlertTitle>
             <AlertDescription>{mensaje}</AlertDescription>
           </Alert>
         </div>
       ) : null}
 
       {errorCitas ? (
-        <div className="fixed top-20 left-1/2 z-50 w-[min(640px,calc(100%-24px))] -translate-x-1/2">
+        <div className="mb-3">
           <Alert variant="destructive">
-            <AlertTitle>Error cargando citas</AlertTitle>
+            <AlertTitle>No se pudieron cargar las citas</AlertTitle>
             <AlertDescription>
-              {typeof errorCitas === 'string' ? errorCitas : 'Ocurrió un error al cargar las citas.'}
+              Revisa que Google Calendar esté configurado en el servidor (Service Account + calendario compartido).
             </AlertDescription>
           </Alert>
         </div>
       ) : null}
 
-      {/* Header */}
-      <div className="flex items-center justify-end mb-3">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-muted-foreground">Sincronizado con Google Calendar</span>
         <Button onClick={() => setModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Cita
         </Button>
       </div>
 
-      {/* Body */}
-      <div className="rounded-lg border bg-card">
-        {loadingCitas ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        ) : (
-          <div className="p-2 md:p-4">
-            <CitasTable
-              citas={citas || []}
-              servicios={servicios}
-              formatearFechaHora={formatearFechaHora}
-              onEdit={handleEdit}
-              onDelete={handleRequestDelete}
-            />
-          </div>
-        )}
-      </div>
+      {loadingCitas ? (
+        <div className="flex items-center justify-center py-10 rounded-lg border bg-card">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Próximas citas */}
+          <section>
+            <h3 className="text-sm font-semibold mb-2">
+              Próximas citas {upcoming.length ? `(${upcoming.length})` : ''}
+            </h3>
+            {upcoming.length ? (
+              <div className="rounded-lg border bg-card p-2 md:p-4">
+                <CitasTable citas={upcoming} formatearFechaHora={formatearFechaHora} onRowClick={setSelected} />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No hay próximas citas.</p>
+            )}
+          </section>
 
-      {/* Modal de crear/editar (si esto sigue siendo MUI adentro, puede causar conflicto con Radix; ideal migrarlo también) */}
+          {/* Citas anteriores */}
+          <section>
+            <h3 className="text-sm font-semibold mb-2">
+              Citas anteriores {past.length ? `(${past.length})` : ''}
+            </h3>
+            <div className="rounded-lg border bg-card p-2 md:p-4">
+              <CitasTable citas={past} formatearFechaHora={formatearFechaHora} onRowClick={setSelected} />
+            </div>
+          </section>
+        </div>
+      )}
+
       <CitaModal
         open={modalOpen}
-        onClose={handleCloseModal}
+        onClose={() => setModalOpen(false)}
         servicios={servicios}
         onSave={handleSave}
-        initialData={selectedCita}
       />
 
-      {/* Confirm delete (shadcn Dialog) */}
-      <Dialog
-        open={confirmOpen}
-        onOpenChange={(v) => {
-          setConfirmOpen(v)
-          if (!v) setCitaToDelete(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Confirmas eliminar esta cita?</DialogTitle>
-            <DialogDescription>
-              Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setConfirmOpen(false)
-                setCitaToDelete(null)
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleConfirmDelete}>
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Detalle de una cita (con editar/eliminar) */}
+      <CitaDetailDialog
+        cita={selected}
+        servicios={servicios}
+        onClose={() => setSelected(null)}
+        onChanged={mutate}
+      />
     </div>
   )
 }

@@ -98,6 +98,9 @@ export default function Header() {
             <NavLink href="/pacientes" active={isActive("/pacientes")}>
               Pacientes
             </NavLink>
+            <NavLink href="/agenda" active={isActive("/agenda")}>
+              Agenda
+            </NavLink>
           </nav>
         ) : (
           <div />

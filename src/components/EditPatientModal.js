@@ -143,11 +143,8 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
               name="apellidos"
               control={control}
               rules={{
-                required: 'Los apellidos son obligatorios.',
-                pattern: {
-                  value: /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/,
-                  message: 'Los apellidos solo pueden contener letras y espacios.',
-                },
+                validate: (v) =>
+                  !v || /^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$/.test(v) || 'Solo letras y espacios.',
               }}
               render={({ field }) => (
                 <Input id="apellidos" {...field} placeholder="Apellidos" aria-invalid={!!errors.apellidos} />
@@ -194,9 +191,8 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
               name="fecha_nacimiento"
               control={control}
               rules={{
-                required: 'La fecha de nacimiento es obligatoria.',
                 validate: (value) => {
-                  if (!value) return 'La fecha de nacimiento es obligatoria.';
+                  if (!value) return true; // opcional
                   const selectedDate = new Date(value);
                   return (
                     (selectedDate >= min && selectedDate <= max) ||
@@ -258,11 +254,8 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
               name="email"
               control={control}
               rules={{
-                required: 'El correo electrónico es obligatorio.',
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Ingrese un correo electrónico válido.',
-                },
+                validate: (v) =>
+                  !v || /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(v) || 'Correo inválido.',
               }}
               render={({ field }) => (
                 <Input
@@ -285,7 +278,7 @@ export default function EditPatientModal({ open, onClose, patient, onSuccess }) 
             <Controller
               name="direccion"
               control={control}
-              rules={{ required: 'La dirección es obligatoria.' }}
+              rules={{}}
               render={({ field }) => (
                 <Input
                   id="direccion"
