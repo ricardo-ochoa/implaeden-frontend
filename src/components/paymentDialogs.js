@@ -239,9 +239,9 @@ export function PaymentFormDialog({
     if (form.monto === '' || Number(form.monto) <= 0) {
       next.monto = 'El monto debe ser mayor a 0.'
     }
-    if (!form.estado) next.estado = 'El estatus es obligatorio.'
     if (!form.metodo_pago) next.metodo_pago = 'El método de pago es obligatorio.'
-    if (!form.notas) next.notas = 'Las notas son obligatorias.'
+    // Nota: el estatus se deriva automáticamente del saldo (abono/pagado) y las
+    // notas son opcionales, para que registrar un abono sea rápido.
 
     setErrors(next)
     return Object.keys(next).length === 0
@@ -252,9 +252,8 @@ export function PaymentFormDialog({
       form.fecha &&
         (lockedServiceId || form.patient_service_id) &&
         form.monto !== '' &&
-        form.estado &&
-        form.metodo_pago &&
-        form.notas
+        Number(form.monto) > 0 &&
+        form.metodo_pago
     )
   }, [form, lockedServiceId])
 
@@ -340,6 +339,22 @@ export function PaymentFormDialog({
     )
     return s ? `${s.name} — ${s.totalCost}` : ''
   }, [orderedServicios, form.patient_service_id, lockedServiceLabel])
+
+  // ✅ tratamiento seleccionado + derivados (saldo, sobre-pago, estado automático)
+  const selectedServicio = useMemo(() => {
+    const id = String(lockedServiceId || form.patient_service_id || '')
+    if (!id) return null
+    return orderedServicios.find((x) => String(x.id) === id) || null
+  }, [orderedServicios, form.patient_service_id, lockedServiceId])
+
+  const saldoSel = selectedServicio ? Number(selectedServicio.saldoPendiente ?? 0) : null
+  const montoNum = Number(form.monto)
+  const montoValido = Number.isFinite(montoNum) && montoNum > 0
+  // sobre-pago: permitido, solo avisamos (decisión "permitir con aviso")
+  const isOverpay = saldoSel != null && montoValido && montoNum - saldoSel > 0.009
+  // estado financiero que quedará (para pagos nuevos lo deriva el backend; aquí solo lo previsualizamos)
+  const estadoPreview =
+    saldoSel == null || !montoValido ? null : saldoSel - montoNum > 0.009 ? 'abono' : 'pagado'
 
   // helper mini para chips
   const tagInfo = (estado) => {
@@ -543,43 +558,93 @@ export function PaymentFormDialog({
             {errors.monto ? (
               <p className="text-xs text-destructive">{errors.monto}</p>
             ) : null}
-          </div>
 
-          {/* Estatus */}
-          <div className="grid gap-2">
-            <Label>Estatus de pago</Label>
-            <Select
-              value={form.estado}
-              onValueChange={(v) => {
-                setForm((s) => ({ ...s, estado: v }))
-                setErrors((prev) => {
-                  if (!prev.estado) return prev
-                  const copy = { ...prev }
-                  delete copy.estado
-                  return copy
-                })
-              }}
-            >
-              <SelectTrigger
-                className={
-                  errors.estado
-                    ? 'border-destructive focus:ring-destructive'
-                    : ''
-                }
-              >
-                <SelectValue placeholder="Selecciona estatus" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="abono">Abono</SelectItem>
-                <SelectItem value="finalizado">Finalizado</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
-                <SelectItem value="reembolsado">Reembolsado</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.estado ? (
-              <p className="text-xs text-destructive">{errors.estado}</p>
+            {/* Saldo del tratamiento + atajo "abonar el resto" */}
+            {saldoSel != null ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  Saldo del tratamiento:{' '}
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(saldoSel)} mxn
+                  </span>
+                </span>
+                {saldoSel > 0 ? (
+                  <button
+                    type="button"
+                    className="text-primary underline underline-offset-4 hover:opacity-80"
+                    onClick={() => {
+                      setForm((s) => ({ ...s, monto: String(saldoSel) }))
+                      setErrors((prev) => {
+                        if (!prev.monto) return prev
+                        const copy = { ...prev }
+                        delete copy.monto
+                        return copy
+                      })
+                    }}
+                  >
+                    Abonar el resto ({formatCurrency(saldoSel)})
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* Aviso de sobre-pago (permitido) */}
+            {isOverpay ? (
+              <p className="text-xs text-amber-600">
+                ⚠️ El monto supera el saldo ({formatCurrency(saldoSel)} mxn). Se registrará
+                de todos modos como sobre-pago.
+              </p>
+            ) : null}
+
+            {/* Estado que quedará (solo informativo en alta; el backend lo fija) */}
+            {!initialData && estadoPreview ? (
+              <p className="text-xs text-muted-foreground">
+                Este pago dejará el tratamiento como{' '}
+                <span className="font-semibold">
+                  {estadoPreview === 'pagado' ? 'PAGADO' : 'ABONO'}
+                </span>
+                .
+              </p>
             ) : null}
           </div>
+
+          {/* Estatus — solo al EDITAR (en alta se deriva automáticamente del saldo) */}
+          {initialData ? (
+            <div className="grid gap-2">
+              <Label>Estatus de pago</Label>
+              <Select
+                value={form.estado}
+                onValueChange={(v) => {
+                  setForm((s) => ({ ...s, estado: v }))
+                  setErrors((prev) => {
+                    if (!prev.estado) return prev
+                    const copy = { ...prev }
+                    delete copy.estado
+                    return copy
+                  })
+                }}
+              >
+                <SelectTrigger
+                  className={
+                    errors.estado
+                      ? 'border-destructive focus:ring-destructive'
+                      : ''
+                  }
+                >
+                  <SelectValue placeholder="Selecciona estatus" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abono">Abono</SelectItem>
+                  <SelectItem value="finalizado">Finalizado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                  <SelectItem value="reembolsado">Reembolsado</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.estado ? (
+                <p className="text-xs text-destructive">{errors.estado}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Método */}
           <div className="grid gap-2">
@@ -663,6 +728,10 @@ export function PaymentFormDialog({
                   lockedServiceId || form.patient_service_id
                 ),
               }
+
+              // En ALTA, el backend deriva el estado (abono/pagado) desde el saldo.
+              // En EDICIÓN sí respetamos el estado elegido por el usuario.
+              if (!initialData) delete payload.estado
 
               await onSave?.(payload)
               onClose?.()
