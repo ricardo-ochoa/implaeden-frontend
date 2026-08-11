@@ -105,14 +105,17 @@ export function PaymentDetailsDialog({ open, onClose, payment, onDownload }) {
             <div className="text-sm">{payment.tratamiento}</div>
           </div>
 
-          {payment.numero_factura ? (
-            <div>
-              <div className="text-xs text-muted-foreground font-semibold mb-1">
-                Número de Factura
-              </div>
-              <div className="text-sm">{payment.numero_factura}</div>
+          <div>
+            <div className="text-xs text-muted-foreground font-semibold mb-1">
+              Folio para facturar
             </div>
-          ) : null}
+            <div className="text-sm font-mono font-semibold">
+              {payment.autofac_folio || String(payment.id)}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              Este es el folio que el paciente teclea en el portal de autofacturación.
+            </div>
+          </div>
 
           {payment.metodo_pago ? (
             <div className="sm:col-span-2">

@@ -7,10 +7,11 @@ import SmartSummaryAssistant from "@/components/SmartSummaryAssistant";
 import PatientDetailClient from "./PatientDetailClient";
 
 export default async function PatientDetailPage({ params }) {
-  const { id } = params;
+  const { id } = await params;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  const token = cookies().get("token")?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   if (!token) redirect("/login");
 
   const res = await fetch(`${baseUrl}/pacientes/${id}`, {
