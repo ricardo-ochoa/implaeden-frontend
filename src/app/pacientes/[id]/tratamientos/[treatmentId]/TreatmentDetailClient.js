@@ -839,7 +839,7 @@ const treatmentsById = useMemo(() => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este tratamiento?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminar este tratamiento</AlertDialogTitle>
             <AlertDialogDescription>
               ¿Deseas eliminar el tratamiento{' '}
               <span className="font-semibold text-foreground">
