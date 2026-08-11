@@ -6,7 +6,19 @@ import {
   History,
   Pen,
   CopyCheck,
+  Trash2,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
 
 import UploadFilesModal from '@/components/UploadFilesModal'
 import FilePreviewModal from '@/components/FilePreviewModal'
@@ -69,9 +81,12 @@ const normalizeTeethIds = (v) => {
 }
 
 export default function TreatmentDetailClient({ paciente, tratamientos = [] }) {
+  const router = useRouter()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [paymentsOpen, setPaymentsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [editDate, setEditDate] = useState('')
   const [editSelectedService, setEditSelectedService] = useState('')
@@ -473,6 +488,17 @@ useEffect(() => {
       >
         <History />
       </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={() => setDeleteOpen(true)}
+        title="Eliminar tratamiento"
+        className="rounded-xl border-destructive text-destructive hover:bg-destructive/10"
+      >
+        <Trash2 />
+      </Button>
     </div>
   )
 
@@ -613,6 +639,28 @@ const modalInitialTreatment = useMemo(() => {
   // ✅ editar SOLO el seleccionado
   return selectedTreatment
 }, [many, editScope, treatmentsState, selectedTreatment, card?.title, card?.group_id])
+
+// Elimina el tratamiento SELECCIONADO. El backend borra en cascada sus pagos,
+// evidencias y comentarios. Muestra loading, feedback de éxito y redirige al
+// listado de tratamientos del paciente.
+const handleDeleteTreatment = async () => {
+  const tid = selectedTreatment?.treatment_id ?? selectedTreatment?.id
+  if (!paciente?.id || !tid) return
+  try {
+    setDeleting(true)
+    await api.delete(`/pacientes/${paciente.id}/tratamientos/${tid}`)
+    setDeleteOpen(false)
+    showSuccess('Tratamiento eliminado', 'El tratamiento se eliminó correctamente.')
+    // breve pausa para que se vea la confirmación antes de navegar
+    setTimeout(() => {
+      router.push(`/pacientes/${paciente.id}/tratamientos`)
+    }, 900)
+  } catch (e) {
+    console.error(e)
+    setDeleting(false)
+    showSuccess('No se pudo eliminar', 'Ocurrió un error al eliminar el tratamiento. Intenta de nuevo.')
+  }
+}
 
 const treatmentsById = useMemo(() => {
   const m = {}
@@ -781,6 +829,47 @@ const treatmentsById = useMemo(() => {
       />
 
       <UpdateStatusModal {...modalProps} />
+
+      {/* Confirmación de eliminación de tratamiento */}
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          if (!deleting) setDeleteOpen(v)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este tratamiento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Deseas eliminar el tratamiento{' '}
+              <span className="font-semibold text-foreground">
+                {selectedTreatment?.service_name || 'Tratamiento'}
+              </span>{' '}
+              de{' '}
+              <span className="font-semibold text-foreground">
+                {`${paciente?.nombre || ''} ${paciente?.apellidos || ''}`.trim() || 'este paciente'}
+              </span>
+              ?
+              <br />
+              Esta acción no se puede deshacer y también elimina sus pagos, evidencias y
+              comentarios asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteTreatment()
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ModalServicio
         open={editOpen}
