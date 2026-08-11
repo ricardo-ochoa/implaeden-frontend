@@ -65,6 +65,34 @@ export default function PatientPaymentsClient({
   const [localPayments, setLocalPayments] = useState(initialPayments || [])
   const isMobile = useIsMobile(768)
 
+  // Tratamientos del paciente para el <Select> del modal. Semilla = SSR
+  // (initialServicios); además refrescamos desde el cliente para no depender
+  // solo del SSR (si esa carga viene vacía, el select quedaría vacío).
+  const [servicios, setServicios] = useState(initialServicios || [])
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await api.get(`/pacientes/${pacienteId}/tratamientos`)
+        const data = Array.isArray(res.data) ? res.data : []
+        if (!cancelled && data.length) {
+          setServicios(
+            data.map((t) => ({
+              id: t.treatment_id,
+              name: t.service_name,
+              totalCost: Number(t.total_cost) || 0,
+            }))
+          )
+        }
+      } catch {
+        /* si falla, nos quedamos con initialServicios (SSR) */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pacienteId])
+
   const getStatusColor = (st) => {
     switch ((st || '').toLowerCase()) {
       case 'finalizado':
@@ -155,7 +183,7 @@ export default function PatientPaymentsClient({
     })
   }
 
-  return (initialServicios || []).map((s) => {
+  return (servicios || []).map((s) => {
     const meta = byService.get(Number(s.id)) || {}
     const totalCost = Number(s.totalCost || meta.totalCost || 0)
     const totalPagado = Number(meta.totalPagado || 0)
@@ -176,7 +204,7 @@ export default function PatientPaymentsClient({
       lastPaymentAt: meta.lastPaymentAt || null,
     }
   })
-}, [initialServicios, localPayments])
+}, [servicios, localPayments])
 
 
   const closeAllSelects = () => {
@@ -610,7 +638,7 @@ const filtered = useMemo(() => {
         open={openEditModal}
         onClose={() => setOpenEditModal(false)}
         initialData={editPayment}
-        servicios={initialServicios}
+        servicios={servicesWithBalance}
         onSave={handleUpdate}
       />
 

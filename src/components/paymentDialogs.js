@@ -265,15 +265,18 @@ export function PaymentFormDialog({
       const ev = (s?.estadoVisual || '').toLowerCase()
       if (ev) return ev
 
-      // fallback si todavía no mandas estadoVisual desde el padre
-      const saldo = Number(s?.saldoPendiente ?? s?.saldo_pendiente ?? 0)
+      // fallback si todavía no mandas estadoVisual desde el padre.
+      // IMPORTANTE: si no viene saldoPendiente, se asume (costo − pagado),
+      // NO 0 — si no, un tratamiento sin pagos se marcaría como "pagado".
+      const totalCost = Number(s?.totalCost ?? s?.total_cost ?? 0)
       const pagado = Number(s?.totalPagado ?? s?.total_pagado ?? 0)
+      const saldoRaw = s?.saldoPendiente ?? s?.saldo_pendiente
+      const saldo = saldoRaw != null ? Number(saldoRaw) : totalCost - pagado
       const status = (s?.estado || s?.status || '').toLowerCase()
 
       if (status === 'cancelado') return 'cancelado'
       if (status === 'reembolsado') return 'reembolsado'
-      if (saldo <= 0 && (pagado > 0 || Number(s?.totalCost ?? s?.total_cost ?? 0) > 0))
-        return 'pagado'
+      if (totalCost > 0 && saldo <= 0.009) return 'pagado'
       if (pagado > 0) return 'abono'
       return 'pendiente'
     }
@@ -326,9 +329,12 @@ export function PaymentFormDialog({
   const visibleServicios = useMemo(() => {
     if (lockedServiceId || hideTreatmentSelect) return orderedServicios
     if (!onlyPending) return orderedServicios
-    return orderedServicios.filter(
+    const pend = orderedServicios.filter(
       (s) => s.__estado === 'pendiente' || s.__estado === 'abono'
     )
+    // Si el filtro esconde TODO pero sí hay tratamientos, muestra todos
+    // (evita un <Select> vacío que confunde).
+    return pend.length ? pend : orderedServicios
   }, [orderedServicios, onlyPending, lockedServiceId, hideTreatmentSelect])
 
   const servicioLabel = useMemo(() => {
