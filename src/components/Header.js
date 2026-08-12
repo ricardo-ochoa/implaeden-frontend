@@ -101,6 +101,9 @@ export default function Header() {
             <NavLink href="/agenda" active={isActive("/agenda")}>
               Agenda
             </NavLink>
+            <NavLink href="/cobranza" active={isActive("/cobranza")}>
+              Cobranza
+            </NavLink>
           </nav>
         ) : (
           <div />
