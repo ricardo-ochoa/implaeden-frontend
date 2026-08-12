@@ -6,8 +6,17 @@ import Link from 'next/link'
 import { fetcher } from '../../../lib/api'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Loader2, User, Calendar } from 'lucide-react'
+import {
+  Loader2, User, Calendar, Search, ListFilter, X,
+  ArrowDownWideNarrow, ArrowUpNarrowWide,
+} from 'lucide-react'
 
 const cx = (...c) => c.filter(Boolean).join(' ')
 const money = (n) =>
@@ -78,15 +87,43 @@ export default function CobranzaClient() {
   const { data, error, isLoading } = useSWR(key, fetcher)
   const items = Array.isArray(data) ? data : []
 
-  const byCol = useMemo(() => {
-    const m = { por_cobrar: [], en_proceso: [], cobrado: [] }
-    for (const it of items) (m[it.estado] || (m[it.estado] = [])).push(it)
-    return m
+  // --- filtros / orden (en cliente) ---
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState([]) // tratamientos seleccionados; vacío = todos
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sortDir, setSortDir] = useState('desc') // por saldo; desc = mayor primero (default)
+
+  const allTreatments = useMemo(() => {
+    const set = new Set(items.map((i) => i.service_name).filter(Boolean))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))
   }, [items])
 
-  // Resumen global (independiente de columnas)
-  const totalPorCobrar = sum(items.filter((i) => i.estado !== 'cobrado'), 'saldo')
-  const totalCobrado = sum(items, 'pagado')
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const sel = new Set(selected)
+    return items.filter((it) => {
+      if (sel.size && !sel.has(it.service_name)) return false
+      if (q) {
+        const hay = `${it.paciente || ''} ${it.service_name || ''} ${it.group_title || ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [items, search, selected])
+
+  const byCol = useMemo(() => {
+    const m = { por_cobrar: [], en_proceso: [], cobrado: [] }
+    for (const it of filtered) (m[it.estado] || (m[it.estado] = [])).push(it)
+    const dir = sortDir === 'asc' ? 1 : -1
+    for (const k of Object.keys(m)) {
+      m[k].sort((a, b) => (Number(a.saldo || 0) - Number(b.saldo || 0)) * dir)
+    }
+    return m
+  }, [filtered, sortDir])
+
+  // Resumen global (refleja los filtros activos)
+  const totalPorCobrar = sum(filtered.filter((i) => i.estado !== 'cobrado'), 'saldo')
+  const totalCobrado = sum(filtered, 'pagado')
 
   return (
     <div>
@@ -116,6 +153,68 @@ export default function CobranzaClient() {
           </span>
         </div>
       </div>
+
+      {/* Búsqueda + filtro por tratamiento + orden */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar paciente o tratamiento…"
+            className="pl-8 w-[240px]"
+          />
+        </div>
+
+        <Button
+          variant={selected.length ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setFilterOpen(true)}
+        >
+          <ListFilter className="h-4 w-4 mr-1.5" />
+          Tratamientos{selected.length ? ` · ${selected.length}` : ''}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+          title="Ordenar cada columna por saldo"
+        >
+          {sortDir === 'desc' ? (
+            <ArrowDownWideNarrow className="h-4 w-4 mr-1.5" />
+          ) : (
+            <ArrowUpNarrowWide className="h-4 w-4 mr-1.5" />
+          )}
+          Saldo {sortDir === 'desc' ? 'mayor → menor' : 'menor → mayor'}
+        </Button>
+      </div>
+
+      {/* Feedback visual de tratamientos filtrados */}
+      {selected.length ? (
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          <span className="text-xs text-muted-foreground">Filtrando por:</span>
+          {selected.map((t) => (
+            <Badge key={t} variant="secondary" className="gap-1">
+              {t}
+              <button
+                type="button"
+                onClick={() => setSelected((prev) => prev.filter((x) => x !== t))}
+                aria-label={`Quitar ${t}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          <button
+            type="button"
+            className="text-xs underline text-muted-foreground ml-1"
+            onClick={() => setSelected([])}
+          >
+            Limpiar
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         <Alert variant="destructive" className="mb-3">
@@ -211,6 +310,62 @@ export default function CobranzaClient() {
           })}
         </div>
       )}
+
+      {/* Modal: filtrar por tratamiento */}
+      <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Filtrar por tratamiento</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              className="underline text-primary"
+              onClick={() => setSelected(allTreatments)}
+            >
+              Seleccionar todos
+            </button>
+            <button
+              type="button"
+              className="underline text-muted-foreground"
+              onClick={() => setSelected([])}
+            >
+              Todos (sin filtro)
+            </button>
+          </div>
+
+          <div className="max-h-[50vh] overflow-y-auto space-y-0.5 mt-1">
+            {allTreatments.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-4 text-center">
+                No hay tratamientos en el periodo.
+              </p>
+            ) : (
+              allTreatments.map((t) => {
+                const checked = selected.includes(t)
+                return (
+                  <label
+                    key={t}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50 cursor-pointer text-sm"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(v) =>
+                        setSelected((prev) => (v ? [...prev, t] : prev.filter((x) => x !== t)))
+                      }
+                    />
+                    <span className="truncate">{t}</span>
+                  </label>
+                )
+              })
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setFilterOpen(false)}>Listo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
