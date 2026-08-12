@@ -851,8 +851,9 @@ const treatmentsById = useMemo(() => {
               </span>
               ?
               <br />
-              Esta acción no se puede deshacer y también elimina sus pagos, evidencias y
-              comentarios asociados.
+              Esta acción no se puede deshacer y elimina sus evidencias y comentarios.
+              <br />
+              <span className="font-medium">Los pagos se conservan</span> como registro histórico.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
