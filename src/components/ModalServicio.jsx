@@ -29,16 +29,6 @@ const toMoney = (n) =>
     Number(n || 0)
   )
 
-// El costo que se captura INCLUYE IVA. Desglosamos 16% incluido:
-//   subtotal = total / 1.16 ; iva = total − subtotal
-const IVA_RATE = 0.16
-const ivaBreakdown = (total) => {
-  const t = Number(total)
-  if (!Number.isFinite(t) || t <= 0) return { subtotal: 0, iva: 0, total: 0 }
-  const subtotal = t / (1 + IVA_RATE)
-  return { subtotal, iva: t - subtotal, total: t }
-}
-
 /** ✅ id robusto (id / service_id / serviceId / _id / pk) */
 const getServiceId = (s) => {
   const v = s?.id ?? s?.service_id ?? s?.serviceId ?? s?._id
@@ -788,15 +778,12 @@ const onSelectedTeethChange = React.useCallback((next) => {
                               {(() => {
                                 const c = parseMoney(rawCost)
                                 if (!Number.isFinite(c) || c <= 0) return null
-                                const { subtotal, iva } = ivaBreakdown(c)
                                 return (
                                   <div
                                     className="mt-1 pr-3 text-right text-[11px] leading-tight text-muted-foreground"
-                                    title="El costo incluye IVA (16%)"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <div>Sin IVA: {toMoney(subtotal)}</div>
-                                    <div>IVA 16%: {toMoney(iva)}</div>
+                                    Exento de IVA
                                   </div>
                                 )
                               })()}
@@ -830,17 +817,12 @@ const onSelectedTeethChange = React.useCallback((next) => {
                 </div>
 
                 <div className="mt-6 border-t pt-4 space-y-2">
-                  {/* Desglose de IVA (16% incluido en el total) */}
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Subtotal (sin IVA)</span>
-                    <span className="font-mono">{toMoney(ivaBreakdown(total).subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>IVA (16%)</span>
-                    <span className="font-mono">{toMoney(ivaBreakdown(total).iva)}</span>
+                    <span>IVA</span>
+                    <span className="font-mono">Exento</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-base font-semibold">Total (IVA incluido):</div>
+                    <div className="text-base font-semibold">Total:</div>
                     <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
                       <ReceiptText className="h-5 w-5" />
                       <div className="text-lg font-mono font-semibold">{toMoney(total)}</div>
