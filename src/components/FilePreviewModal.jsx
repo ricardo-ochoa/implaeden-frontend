@@ -15,6 +15,14 @@ const isVideo = (m) => {
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(url)
 }
 
+// El historial clínico mezcla imágenes y PDF escaneados en la misma galería.
+const isPdf = (m) => {
+  const mime = String(m?.mime_type || '')
+  if (mime === 'application/pdf') return true
+  const url = String(m?.file_url || m?.url || '')
+  return /\.pdf($|\?)/i.test(url)
+}
+
 const getName = (m) => m?.original_name || m?.file?.name || 'Evidencia'
 const getUrl = (m) => m?.file_url || m?.url || ''
 
@@ -120,6 +128,7 @@ export default function FilePreviewModal({
                 {media.map((m, idx) => {
                   const url = getUrl(m)
                   const video = isVideo(m)
+                  const pdf = !video && isPdf(m)
 
                   return (
                     <SwiperSlide key={m?.id ?? `${url}-${idx}`}>
@@ -131,6 +140,15 @@ export default function FilePreviewModal({
                             playsInline
                             className="max-w-full max-h-full object-contain"
                             onLoadedMetadata={() => swiperRef.current?.update?.()}
+                          />
+                        ) : pdf ? (
+                          // El iframe se come el gesto de arrastre, así que se
+                          // deja margen a los lados para poder pasar de slide
+                          // (además de las flechas y el teclado).
+                          <iframe
+                            src={url}
+                            title={getName(m)}
+                            className="h-full w-[calc(100%-6rem)] bg-white"
                           />
                         ) : (
                           <img

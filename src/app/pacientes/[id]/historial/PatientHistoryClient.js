@@ -15,6 +15,7 @@ import React, { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import api, { fetcher } from '../../../../../lib/api'
+import { descargarArchivo, mensajeDeErrorBlob } from '../../../../../lib/utils/descargarArchivo'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -28,10 +29,32 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 
 // icons
-import { FilePlus2, FileText, Paperclip, Pencil, Trash2, Upload, Loader2 } from 'lucide-react'
+import {
+  Download,
+  FilePlus2,
+  FileText,
+  Loader2,
+  MoreVertical,
+  Paperclip,
+  Pencil,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 import UploadFilesModal from '@/components/UploadFilesModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
+// Extensión explícita a propósito: existen FilePreviewModal.js (modal MUI viejo,
+// API { file }) y FilePreviewModal.jsx (galería Swiper, API { items }). El
+// resolve de webpack prueba .js antes que .jsx, así que el import "pelado"
+// traería el equivocado en el build de producción.
+import FilePreviewModal from '@/components/FilePreviewModal.jsx'
 import { ESTADOS_EXPEDIENTE } from '@/components/expediente-clinico/constants'
 import { hoyYMD, normalizeExpediente, resumenExpediente } from '@/components/expediente-clinico/defaults'
 
@@ -44,6 +67,15 @@ const nombreArchivo = (url) => (url || '').split('/').pop() || 'archivo'
 const formatYMD = (ymd) => {
   const [y, m, d] = (ymd || '').split('-')
   return y && m && d ? `${d}/${m}/${y}` : ymd || 'sin fecha'
+}
+
+// Las tres opciones del menú abren algo modal (confirmación de borrado, overlay
+// de "Generando PDF"). Radix mantiene `pointer-events: none` en el body hasta
+// que termina de cerrar el menú, así que la acción se difiere un tick para que
+// el modal no nazca sobre una página que no recibe clics.
+const diferir = (accion) => (evento) => {
+  evento.preventDefault()
+  setTimeout(() => accion?.(), 0)
 }
 
 export default function PatientHistoryClient({
@@ -78,6 +110,7 @@ export default function PatientHistoryClient({
 
   const [isSaving, setIsSaving] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
 
   const [isDeleting, setIsDeleting] = useState(false)
@@ -89,7 +122,8 @@ export default function PatientHistoryClient({
   const [newFiles, setNewFiles] = useState([])
 
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewFile, setPreviewFile] = useState(null)
+  const [previewItems, setPreviewItems] = useState([])
+  const [previewIndex, setPreviewIndex] = useState(0)
 
   // Items de la lista: expedientes digitales + archivos agrupados por día,
   // todo mezclado y ordenado de la fecha más reciente a la más antigua.
@@ -123,13 +157,67 @@ export default function PatientHistoryClient({
     )
   }, [clinicalRecords, expedientes])
 
-  const openPreview = (rec) => {
-    setPreviewFile({
-      preview: rec.file_url,
-      type: esPdf(rec.file_url) ? 'application/pdf' : 'image/*',
-      name: nombreArchivo(rec.file_url),
-    })
+  // Solo los escaneados se pueden exportar a PDF hoy.
+  const hayArchivos = (clinicalRecords || []).length > 0
+
+  // Abre la galería con todos los archivos de esa fecha, posicionada en el que
+  // se tocó, para poder pasar entre ellos sin cerrar y volver a abrir.
+  const openPreview = (recs, index) => {
+    setPreviewItems(
+      recs.map((rec) => ({
+        id: rec.id,
+        file_url: rec.file_url,
+        original_name: nombreArchivo(rec.file_url),
+      }))
+    )
+    setPreviewIndex(index)
     setPreviewOpen(true)
+  }
+
+  // Descarga los escaneados como un solo PDF. Sin `fecha` baja todo el
+  // historial; con `fecha`, solo ese registro. El PDF lo arma el backend.
+  const descargarPdf = async (fecha) => {
+    setIsDownloading(true)
+    try {
+      const { headers } = await descargarArchivo(
+        `/clinical-histories/${pid}/pdf${fecha ? `?date=${fecha}` : ''}`,
+        `expediente-${fecha || 'completo'}.pdf`
+      )
+
+      // El backend avisa por cabecera qué archivos no pudo meter (formatos que
+      // un PDF no admite, o que ya no están en el bucket).
+      const omitidos = Number(headers['x-archivos-omitidos'] || 0)
+      if (omitidos > 0) {
+        toast.warning(
+          `PDF descargado, pero ${omitidos} archivo${omitidos === 1 ? '' : 's'} no se pudo incluir. Ver la última página.`
+        )
+      } else {
+        toast.success('PDF descargado')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error(await mensajeDeErrorBlob(err, 'No se pudo generar el PDF'))
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  // El expediente capturado en la app se imprime desde su JSON: el backend
+  // arma el formato FO-CD-00003 con odontograma incluido.
+  const descargarExpedientePdf = async (expedienteId) => {
+    setIsDownloading(true)
+    try {
+      await descargarArchivo(
+        `/pacientes/${pid}/expediente/${expedienteId}/pdf`,
+        `expediente-clinico-${expedienteId}.pdf`
+      )
+      toast.success('PDF descargado')
+    } catch (err) {
+      console.error(err)
+      toast.error(await mensajeDeErrorBlob(err, 'No se pudo generar el PDF'))
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   // Crea un borrador con los datos generales precargados y abre el wizard.
@@ -241,7 +329,7 @@ export default function PatientHistoryClient({
   return (
     <>
       {/* Overlay loading (guardando/eliminando/creando) */}
-      {(isSaving || isDeleting || isCreating) ? (
+      {(isSaving || isDeleting || isCreating || isDownloading) ? (
         <Dialog open>
           <DialogContent className="sm:max-w-[420px]">
             <DialogHeader className="sr-only">
@@ -250,7 +338,13 @@ export default function PatientHistoryClient({
             <div className="py-8 flex flex-col items-center gap-3">
               <Loader2 className="h-6 w-6 animate-spin" />
               <p className="text-sm text-muted-foreground">
-                {isSaving ? 'Guardando…' : isDeleting ? 'Eliminando…' : 'Creando expediente…'}
+                {isSaving
+                  ? 'Guardando…'
+                  : isDeleting
+                    ? 'Eliminando…'
+                    : isDownloading
+                      ? 'Generando PDF…'
+                      : 'Creando expediente…'}
               </p>
             </div>
           </DialogContent>
@@ -268,6 +362,21 @@ export default function PatientHistoryClient({
 
       {/* CTAs */}
       <div className="flex flex-wrap justify-end gap-2">
+        {/* Descarga todo el historial escaneado en un solo PDF, cronológico. */}
+        <Button
+          variant="outline"
+          onClick={() => descargarPdf()}
+          disabled={!hayArchivos}
+          title={
+            hayArchivos
+              ? 'Descargar todos los archivos escaneados en un PDF'
+              : 'No hay archivos escaneados que descargar'
+          }
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Descargar todo
+        </Button>
+
         <Button variant="outline" onClick={() => setModalOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
           Subir archivos
@@ -290,6 +399,7 @@ export default function PatientHistoryClient({
                 onOpen={() =>
                   router.push(`/pacientes/${pid}/historial/expediente/${item.expediente.id}`)
                 }
+                onDownload={() => descargarExpedientePdf(item.expediente.id)}
                 onDelete={() =>
                   pedirBorrado(
                     'expediente',
@@ -307,6 +417,7 @@ export default function PatientHistoryClient({
                   setNewDate(item.fecha)
                   setModalOpen(true)
                 }}
+                onDownload={() => descargarPdf(item.fecha)}
                 onDeleteGroup={() =>
                   pedirBorrado(
                     'grupo',
@@ -335,34 +446,15 @@ export default function PatientHistoryClient({
         </div>
       )}
 
-      {/* Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 overflow-hidden">
-          <DialogHeader className="px-4 py-3 border-b">
-            <div className="flex items-center justify-between gap-3">
-              <DialogTitle className="text-sm font-semibold truncate">
-                {previewFile?.name}
-              </DialogTitle>
-            </div>
-          </DialogHeader>
-
-          <div className="h-[calc(90vh-56px)] w-full">
-            {previewFile?.type === 'application/pdf' ? (
-              <iframe
-                src={previewFile?.preview}
-                title={previewFile?.name}
-                className="h-full w-full"
-              />
-            ) : (
-              <img
-                src={previewFile?.preview}
-                alt={previewFile?.name}
-                className="h-full w-full object-contain bg-black/5"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Galería: mismo visor que las evidencias de tratamiento (Swiper con
+          flechas, paginación y teclado). */}
+      <FilePreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        items={previewItems}
+        startIndex={previewIndex}
+        onIndexChange={setPreviewIndex}
+      />
 
       {/* Subida de archivos (feature original, intacto) */}
       <UploadFilesModal
@@ -419,7 +511,7 @@ function RowShell({ icon, titulo, fecha, badge, resumen, acciones, children }) {
   )
 }
 
-function ExpedienteRow({ item, onOpen, onDelete }) {
+function ExpedienteRow({ item, onOpen, onDownload, onDelete }) {
   const { expediente } = item
   const estado = ESTADOS_EXPEDIENTE[expediente.status] || ESTADOS_EXPEDIENTE.borrador
   const resumen = resumenExpediente(expediente)
@@ -437,22 +529,40 @@ function ExpedienteRow({ item, onOpen, onDelete }) {
             <Pencil className="h-4 w-4 mr-2" />
             Abrir
           </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            onClick={onDelete}
-            title="Eliminar expediente"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <MenuAcciones>
+            <DropdownMenuItem onSelect={diferir(onDownload)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={diferir(onDelete)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar
+            </DropdownMenuItem>
+          </MenuAcciones>
         </>
       }
     />
   )
 }
 
-function ArchivosRow({ item, onPreview, onAdd, onDeleteGroup, onDeleteFile }) {
+// Botón de tres puntos compartido por las dos filas.
+function MenuAcciones({ children }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" size="icon" variant="outline" title="Más acciones">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">{children}</DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ArchivosRow({ item, onPreview, onAdd, onDownload, onDeleteGroup, onDeleteFile }) {
   const { recs } = item
   // Con un solo archivo, el botón de la fila ya lo borra: repetir el ícono
   // sobre la miniatura sería redundante.
@@ -461,35 +571,42 @@ function ArchivosRow({ item, onPreview, onAdd, onDeleteGroup, onDeleteFile }) {
   return (
     <RowShell
       icon={<Paperclip className="h-4 w-4" />}
-      titulo={`Archivos (${recs.length})`}
-      fecha={`Registro del ${formatYMD(item.fecha)}`}
+      titulo="Expediente clínico"
+      // El badge distingue esta fila de la del expediente capturado en la app,
+      // que lleva el mismo título pero con estado borrador/completado.
+      badge={<Badge variant="outline">Escaneado</Badge>}
+      fecha={`${recs.length} archivo${recs.length === 1 ? '' : 's'} · Registro del ${formatYMD(item.fecha)}`}
       acciones={
         <>
           <Button type="button" size="sm" variant="outline" onClick={onAdd}>
             <Upload className="h-4 w-4 mr-2" />
             Agregar
           </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            onClick={onDeleteGroup}
-            title={recs.length > 1 ? `Eliminar los ${recs.length} archivos` : 'Eliminar archivo'}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <MenuAcciones>
+            <DropdownMenuItem onSelect={diferir(onDownload)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={diferir(onDeleteGroup)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {recs.length > 1 ? `Eliminar los ${recs.length} archivos` : 'Eliminar'}
+            </DropdownMenuItem>
+          </MenuAcciones>
         </>
       }
     >
       <div className="mt-3 flex flex-wrap gap-2 pl-0 sm:pl-12">
-        {recs.map((rec) => {
+        {recs.map((rec, index) => {
           const nombre = nombreArchivo(rec.file_url)
 
           return (
             <div key={rec.id} className="relative">
               <button
                 type="button"
-                onClick={() => onPreview(rec)}
+                onClick={() => onPreview(recs, index)}
                 className="block h-20 w-20 overflow-hidden rounded-md border transition hover:opacity-90"
                 title={nombre}
               >
