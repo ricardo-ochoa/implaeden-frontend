@@ -135,6 +135,10 @@ export default function Header() {
                   <Link href="/admin/servicios">Tratamientos / Servicios</Link>
                 </DropdownMenuItem>
 
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/medicos">Médicos</Link>
+                </DropdownMenuItem>
+
                 {/* Aquí luego metemos más secciones admin */}
                 {/* <DropdownMenuItem asChild>
                   <Link href="/admin/usuarios">Usuarios</Link>

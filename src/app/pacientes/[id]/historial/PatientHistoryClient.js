@@ -1,51 +1,63 @@
 'use client'
 
+// ---------------------------------------------------------------------------
+// Historial clínico del paciente: una sola LISTA de items ordenada por fecha,
+// con dos tipos que conviven:
+//
+//   - expediente : el formato FO-CD-00003 capturado en la app (clinical_records)
+//   - archivos   : imágenes/PDF escaneados de esa fecha (clinical_histories)
+//
+// El feature de subir archivos se conserva tal cual; lo nuevo es poder llenar
+// el expediente digitalmente en el wizard (/historial/expediente/[recordId]).
+// ---------------------------------------------------------------------------
+
 import React, { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import api, { fetcher } from '../../../../../lib/api'
-import { useRandomAvatar } from '../../../../../lib/hooks/useRandomAvatar'
-import { formatDate } from '../../../../../lib/utils/formatDate'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 
 // icons
-import { Eye, Trash2, Upload, X, Loader2 } from 'lucide-react'
+import { FilePlus2, FileText, Paperclip, Pencil, Trash2, Upload, Loader2 } from 'lucide-react'
 
-// Tus modales existentes (si aún son MUI, funcionan, pero ideal migrarlos luego)
 import UploadFilesModal from '@/components/UploadFilesModal'
 import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
+import { ESTADOS_EXPEDIENTE } from '@/components/expediente-clinico/constants'
+import { hoyYMD, normalizeExpediente, resumenExpediente } from '@/components/expediente-clinico/defaults'
 
-const cx = (...classes) => classes.filter(Boolean).join(' ')
+const esPdf = (url) => (url || '').toLowerCase().endsWith('.pdf')
+const nombreArchivo = (url) => (url || '').split('/').pop() || 'archivo'
+
+// "2026-08-13" -> "13/08/2026". No se usa lib/utils/formatDate porque construye
+// un Date: `new Date('2026-08-13')` se interpreta como UTC y en México (UTC-6)
+// termina mostrando el día anterior.
+const formatYMD = (ymd) => {
+  const [y, m, d] = (ymd || '').split('-')
+  return y && m && d ? `${d}/${m}/${y}` : ymd || 'sin fecha'
+}
 
 export default function PatientHistoryClient({
-  patient, patientId,
+  patient,
+  patientId,
   clinicalRecords: initialHistoryData,
+  expedientes: initialExpedientes,
 }) {
-  const defaultAvatar = useRandomAvatar()
-  const pid = Number(
-  patientId ?? patient?.id ?? patient?.patient_id ?? patient?.paciente_id
-)
-const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim() || 'Paciente'
-const avatarUrl = patient?.foto_perfil_url || defaultAvatar
+  const router = useRouter()
 
-if (!pid) {
-  return (
-    <Alert variant="destructive">
-      <AlertTitle>Error</AlertTitle>
-      <AlertDescription>Falta patientId/patient.id para cargar historial clínico.</AlertDescription>
-    </Alert>
+  const pid = Number(
+    patientId ?? patient?.id ?? patient?.patient_id ?? patient?.paciente_id
   )
-}
+  const patientName = `${patient?.nombre || ''} ${patient?.apellidos || ''}`.trim() || 'Paciente'
 
   const {
     data: clinicalRecords,
@@ -56,12 +68,21 @@ if (!pid) {
     fallbackData: initialHistoryData,
   })
 
+  const {
+    data: expedientes,
+    isLoading: isLoadingExpedientes,
+    mutate: mutateExpedientes,
+  } = useSWR(pid ? `/pacientes/${pid}/expediente` : null, fetcher, {
+    fallbackData: initialExpedientes,
+  })
+
   const [isSaving, setIsSaving] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
 
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [toDelete, setToDelete] = useState(null)
+  const [toDelete, setToDelete] = useState(null) // { tipo, id, label }
   const [deleteError, setDeleteError] = useState(null)
 
   const [newDate, setNewDate] = useState('')
@@ -70,28 +91,62 @@ if (!pid) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
 
-  const groupedRecords = useMemo(() => {
-    return (clinicalRecords || []).reduce((acc, rec) => {
-      const day = (rec.record_date || '').split('T')[0]
+  // Items de la lista: expedientes digitales + archivos agrupados por día,
+  // todo mezclado y ordenado de la fecha más reciente a la más antigua.
+  const items = useMemo(() => {
+    const porFecha = (rec) => (rec?.record_date || '').split('T')[0]
+
+    const archivos = (clinicalRecords || []).reduce((acc, rec) => {
+      const day = porFecha(rec)
       if (!day) return acc
       if (!acc[day]) acc[day] = []
       acc[day].push(rec)
       return acc
     }, {})
-  }, [clinicalRecords])
 
-  const hasRecords = Object.keys(groupedRecords).length > 0
+    const itemsArchivos = Object.entries(archivos).map(([fecha, recs]) => ({
+      key: `archivos-${fecha}`,
+      tipo: 'archivos',
+      fecha,
+      recs,
+    }))
+
+    const itemsExpedientes = (expedientes || []).map((exp) => ({
+      key: `expediente-${exp.id}`,
+      tipo: 'expediente',
+      fecha: porFecha(exp),
+      expediente: exp,
+    }))
+
+    return [...itemsExpedientes, ...itemsArchivos].sort((a, b) =>
+      (b.fecha || '').localeCompare(a.fecha || '')
+    )
+  }, [clinicalRecords, expedientes])
 
   const openPreview = (rec) => {
-    const isPdf = (rec.file_url || '').toLowerCase().endsWith('.pdf')
-    const fileName = (rec.file_url || '').split('/').pop() || 'archivo'
-
     setPreviewFile({
       preview: rec.file_url,
-      type: isPdf ? 'application/pdf' : 'image/*',
-      name: fileName,
+      type: esPdf(rec.file_url) ? 'application/pdf' : 'image/*',
+      name: nombreArchivo(rec.file_url),
     })
     setPreviewOpen(true)
+  }
+
+  // Crea un borrador con los datos generales precargados y abre el wizard.
+  const handleCreateExpediente = async () => {
+    setIsCreating(true)
+    try {
+      const { data } = await api.post(`/pacientes/${pid}/expediente`, {
+        record_date: hoyYMD(),
+        form_data: normalizeExpediente(null, patient),
+      })
+      await mutateExpedientes()
+      router.push(`/pacientes/${pid}/historial/expediente/${data.id}`)
+    } catch (err) {
+      console.error(err)
+      toast.error(err?.response?.data?.error || 'Error creando el expediente')
+      setIsCreating(false)
+    }
   }
 
   const handleSave = async () => {
@@ -111,10 +166,10 @@ if (!pid) {
       setModalOpen(false)
       setNewDate('')
       setNewFiles([])
-      toast.success('Expediente guardado')
+      toast.success('Archivos guardados')
     } catch (err) {
       console.error(err)
-      toast.error('Error guardando expediente')
+      toast.error('Error guardando archivos')
     } finally {
       setIsSaving(false)
     }
@@ -127,15 +182,24 @@ if (!pid) {
     setDeleteError(null)
 
     try {
-      await api.delete(`/clinical-histories/${toDelete.id}`)
-      await mutate()
+      if (toDelete.tipo === 'expediente') {
+        await api.delete(`/pacientes/${pid}/expediente/${toDelete.ids[0]}`)
+        await mutateExpedientes()
+        toast.success('Expediente eliminado')
+      } else {
+        // 'archivo' borra uno; 'grupo' borra todos los de esa fecha.
+        await Promise.all(
+          toDelete.ids.map((id) => api.delete(`/clinical-histories/${id}`))
+        )
+        await mutate()
+        toast.success(toDelete.ids.length > 1 ? 'Archivos eliminados' : 'Archivo eliminado')
+      }
+
       setDeleteOpen(false)
       setToDelete(null)
-      toast.success('Archivo eliminado')
     } catch (err) {
       console.error(err)
-      const msg =
-        err?.response?.data?.message || 'Error al eliminar el archivo.'
+      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Error al eliminar.'
       setDeleteError(msg)
       toast.error(msg)
     } finally {
@@ -143,7 +207,21 @@ if (!pid) {
     }
   }
 
-  if (isLoading) {
+  const pedirBorrado = (tipo, ids, label) => {
+    setToDelete({ tipo, ids, label })
+    setDeleteOpen(true)
+  }
+
+  if (!pid) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>Falta patientId/patient.id para cargar historial clínico.</AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (isLoading || isLoadingExpedientes) {
     return (
       <div className="py-10 flex justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -155,23 +233,24 @@ if (!pid) {
     return (
       <Alert variant="destructive">
         <AlertTitle>Error</AlertTitle>
-        <AlertDescription>
-          Error al cargar el historial clínico.
-        </AlertDescription>
+        <AlertDescription>Error al cargar el historial clínico.</AlertDescription>
       </Alert>
     )
   }
 
   return (
     <>
-      {/* Overlay loading (guardando/eliminando) */}
-      {(isSaving || isDeleting) ? (
+      {/* Overlay loading (guardando/eliminando/creando) */}
+      {(isSaving || isDeleting || isCreating) ? (
         <Dialog open>
           <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Procesando</DialogTitle>
+            </DialogHeader>
             <div className="py-8 flex flex-col items-center gap-3">
               <Loader2 className="h-6 w-6 animate-spin" />
               <p className="text-sm text-muted-foreground">
-                {isSaving ? 'Guardando…' : 'Eliminando…'}
+                {isSaving ? 'Guardando…' : isDeleting ? 'Eliminando…' : 'Creando expediente…'}
               </p>
             </div>
           </DialogContent>
@@ -179,7 +258,7 @@ if (!pid) {
       ) : null}
 
       {deleteError ? (
-        <div className="mt-3">
+        <div className="mb-3">
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{deleteError}</AlertDescription>
@@ -187,114 +266,70 @@ if (!pid) {
         </div>
       ) : null}
 
-      {/* CTA */}
-      <div className="flex justify-end">
-        <Button onClick={() => setModalOpen(true)}>
+      {/* CTAs */}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" onClick={() => setModalOpen(true)}>
           <Upload className="h-4 w-4 mr-2" />
-          Agregar historial clínico
+          Subir archivos
+        </Button>
+
+        <Button onClick={handleCreateExpediente}>
+          <FilePlus2 className="h-4 w-4 mr-2" />
+          Nuevo expediente
         </Button>
       </div>
 
-      {/* Grid de tarjetas */}
-      {hasRecords ? (
-        <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(groupedRecords).map(([date, recs]) => (
-            <Card key={date} className="border">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={avatarUrl} alt={patientName} />
-                    <AvatarFallback>
-                      {(patientName?.[0] || 'P').toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium leading-none">
-                      {patientName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Historial clínico: <span className="font-semibold">{formatDate(date)}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 w-100%">
-                  {recs.map((rec) => {
-                    const isPdf = (rec.file_url || '').toLowerCase().endsWith('.pdf')
-                    const fileName = (rec.file_url || '').split('/').pop() || 'archivo'
-
-                    return (
-                      <div key={rec.id} className="relative w-100%">
-                        <button
-                          type="button"
-                          onClick={() => openPreview(rec)}
-                          className="w-full overflow-hidden rounded-md border hover:opacity-95 transition"
-                          title={fileName}
-                        >
-                          {isPdf ? (
-                            <div className="h-[110px] w-full flex items-center justify-center text-xs text-muted-foreground bg-muted">
-                              PDF
-                            </div>
-                          ) : (
-                            // thumbnail imagen
-                            <img
-                              src={rec.file_url}
-                              alt={fileName}
-                              className="h-[110px] w-full object-cover"
-                              loading="lazy"
-                            />
-                          )}
-                        </button>
-
-                        {/* acciones */}
-                        <div className="absolute top-2 right-2 flex gap-2">
-                          <Button
-                            type="button"
-                            size="icon"
-                            onClick={() => openPreview(rec)}
-                            title="Ver"
-                          >
-                            <Eye />
-                          </Button>
-
-                          <Button
-                            type="button"
-                            size="icon"
-                            onClick={() => {
-                              setToDelete(rec)
-                              setDeleteOpen(true)
-                            }}
-                            title="Eliminar"
-                          >
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-
-              <CardFooter className="p-4 pt-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setModalOpen(true)}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {recs.length ? 'Actualizar' : 'Subir'}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+      {/* Lista unificada */}
+      {items.length ? (
+        <Card className="mt-6 divide-y">
+          {items.map((item) =>
+            item.tipo === 'expediente' ? (
+              <ExpedienteRow
+                key={item.key}
+                item={item}
+                onOpen={() =>
+                  router.push(`/pacientes/${pid}/historial/expediente/${item.expediente.id}`)
+                }
+                onDelete={() =>
+                  pedirBorrado(
+                    'expediente',
+                    [item.expediente.id],
+                    `el expediente del ${formatYMD(item.fecha)}`
+                  )
+                }
+              />
+            ) : (
+              <ArchivosRow
+                key={item.key}
+                item={item}
+                onPreview={openPreview}
+                onAdd={() => {
+                  setNewDate(item.fecha)
+                  setModalOpen(true)
+                }}
+                onDeleteGroup={() =>
+                  pedirBorrado(
+                    'grupo',
+                    item.recs.map((r) => r.id),
+                    item.recs.length > 1
+                      ? `los ${item.recs.length} archivos del ${formatYMD(item.fecha)}`
+                      : `el archivo del ${formatYMD(item.fecha)}`
+                  )
+                }
+                onDeleteFile={(rec) =>
+                  pedirBorrado('archivo', [rec.id], nombreArchivo(rec.file_url))
+                }
+              />
+            )
+          )}
+        </Card>
       ) : (
         <div className="mt-6">
           <Alert>
             <AlertTitle>Sin historial</AlertTitle>
             <AlertDescription>
               No hay historial clínico para <span className="font-semibold">{patientName}</span>.
+              Crea un expediente digital o sube los archivos escaneados.
             </AlertDescription>
           </Alert>
         </div>
@@ -329,24 +364,165 @@ if (!pid) {
         </DialogContent>
       </Dialog>
 
-      {/* Upload modal (tu componente existente) */}
+      {/* Subida de archivos (feature original, intacto) */}
       <UploadFilesModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        title="Subir archivos al historial clínico:"
         newRecordDate={newDate}
         setNewRecordDate={setNewDate}
         setNewRecordFiles={setNewFiles}
         handleSaveRecord={handleSave}
       />
 
-      {/* Confirm delete (tu componente existente) */}
       <ConfirmDeleteModal
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        title="Eliminar expediente"
-        description="¿Seguro que quieres eliminar este archivo?"
+        title={
+          toDelete?.tipo === 'expediente'
+            ? 'Eliminar expediente'
+            : toDelete?.ids?.length > 1
+              ? 'Eliminar archivos'
+              : 'Eliminar archivo'
+        }
+        description={`¿Seguro que quieres eliminar ${toDelete?.label || 'este elemento'}? Esta acción no se puede deshacer.`}
         onConfirm={handleDelete}
       />
     </>
+  )
+}
+
+function RowShell({ icon, titulo, fecha, badge, resumen, acciones, children }) {
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          {icon}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold">{titulo}</p>
+            {badge}
+          </div>
+          <p className="text-xs text-muted-foreground">{fecha}</p>
+          {resumen ? (
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{resumen}</p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">{acciones}</div>
+      </div>
+
+      {children}
+    </div>
+  )
+}
+
+function ExpedienteRow({ item, onOpen, onDelete }) {
+  const { expediente } = item
+  const estado = ESTADOS_EXPEDIENTE[expediente.status] || ESTADOS_EXPEDIENTE.borrador
+  const resumen = resumenExpediente(expediente)
+
+  return (
+    <RowShell
+      icon={<FileText className="h-4 w-4" />}
+      titulo="Expediente clínico"
+      fecha={`Consulta del ${formatYMD(item.fecha)}`}
+      badge={<Badge variant={estado.variant}>{estado.label}</Badge>}
+      resumen={resumen}
+      acciones={
+        <>
+          <Button type="button" size="sm" onClick={onOpen}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Abrir
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={onDelete}
+            title="Eliminar expediente"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      }
+    />
+  )
+}
+
+function ArchivosRow({ item, onPreview, onAdd, onDeleteGroup, onDeleteFile }) {
+  const { recs } = item
+  // Con un solo archivo, el botón de la fila ya lo borra: repetir el ícono
+  // sobre la miniatura sería redundante.
+  const borrarPorArchivo = recs.length > 1
+
+  return (
+    <RowShell
+      icon={<Paperclip className="h-4 w-4" />}
+      titulo={`Archivos (${recs.length})`}
+      fecha={`Registro del ${formatYMD(item.fecha)}`}
+      acciones={
+        <>
+          <Button type="button" size="sm" variant="outline" onClick={onAdd}>
+            <Upload className="h-4 w-4 mr-2" />
+            Agregar
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={onDeleteGroup}
+            title={recs.length > 1 ? `Eliminar los ${recs.length} archivos` : 'Eliminar archivo'}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      }
+    >
+      <div className="mt-3 flex flex-wrap gap-2 pl-0 sm:pl-12">
+        {recs.map((rec) => {
+          const nombre = nombreArchivo(rec.file_url)
+
+          return (
+            <div key={rec.id} className="relative">
+              <button
+                type="button"
+                onClick={() => onPreview(rec)}
+                className="block h-20 w-20 overflow-hidden rounded-md border transition hover:opacity-90"
+                title={nombre}
+              >
+                {esPdf(rec.file_url) ? (
+                  <span className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
+                    PDF
+                  </span>
+                ) : (
+                  <img
+                    src={rec.file_url}
+                    alt={nombre}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </button>
+
+              {borrarPorArchivo ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="absolute -right-1.5 -top-1.5 h-6 w-6 rounded-full bg-background shadow-sm hover:text-destructive"
+                  onClick={() => onDeleteFile(rec)}
+                  title={`Eliminar ${nombre}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </RowShell>
   )
 }

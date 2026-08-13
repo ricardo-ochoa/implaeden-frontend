@@ -20,24 +20,30 @@ export default async function PatientHistoryPage({ params }) {
   };
 
   const revalidationOptions = {
-    next: { 
+    next: {
       revalidate: 600 // Cachea los datos por 10 minutos
-    }, 
-    headers: authHeaders 
+    },
+    headers: authHeaders
   };
 
-  const [pRes, hRes] = await Promise.all([
+  const [pRes, hRes, eRes] = await Promise.all([
     fetch(`${baseUrl}/pacientes/${patientId}`, revalidationOptions),
     fetch(`${baseUrl}/clinical-histories/${patientId}`, revalidationOptions).catch(() => null),
+    // Los expedientes digitales se guardan paso a paso: sin caché para que al
+    // volver del wizard la lista muestre el estado real.
+    fetch(`${baseUrl}/pacientes/${patientId}/expediente`, {
+      cache: 'no-store',
+      headers: authHeaders,
+    }).catch(() => null),
   ]);
 
   if (!pRes.ok) {
     const errorText = await pRes.text();
     throw new Error(`Error cargando paciente (${pRes.status}): ${errorText}`);
   }
-  
+
   const patient = await pRes.json();
-  
+
   // --- LÓGICA CORREGIDA ---
   let clinicalRecords = []; // 1. Declara la variable vacía
 
@@ -51,6 +57,13 @@ export default async function PatientHistoryPage({ params }) {
   }
   // Si hRes es null o es un 404, clinicalRecords simplemente se queda como un array vacío.
 
+  // Mismo criterio para los expedientes digitales: si fallan, la sección de
+  // archivos debe seguir sirviendo.
+  let expedientes = [];
+  if (eRes && eRes.ok) {
+    expedientes = await eRes.json();
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <SectionTitle
@@ -61,7 +74,12 @@ export default async function PatientHistoryPage({ params }) {
           { label: 'Historial clínico' },
         ]}
       />
-      <PatientHistoryClient patient={patient} clinicalRecords={clinicalRecords} />
+      <PatientHistoryClient
+        patient={patient}
+        patientId={patientId}
+        clinicalRecords={clinicalRecords}
+        expedientes={expedientes}
+      />
     </div>
   )
 }
