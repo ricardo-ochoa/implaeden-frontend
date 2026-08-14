@@ -25,7 +25,11 @@ import UpdateStatusModal from '@/components/UpdateStatusModal'
 import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
 import usePatientTreatments from '../../../../../lib/hooks/usePatientTreatments'
 import api from '../../../../../lib/api'
-import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
+import DiagramaTratamientos, {
+  derivarTeethDeTratamientos,
+} from '@/components/tratamientos/DiagramaTratamientos'
+import ToothHistoryModal from '@/components/tratamientos/ToothHistoryModal'
+import useTeethCatalog from '../../../../../lib/hooks/useTeethCatalog'
 import { Input } from '@/components/ui/input'
 import useTreatmentStatusModal from '../../../../../lib/hooks/useTreatmentStatusModal'
 
@@ -150,7 +154,6 @@ export default function TratamientosClient({ paciente }) {
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [selectedTreatment, setSelectedTreatment] = useState(null)
   const [newStatus, setNewStatus] = useState('')
-  const [selectedTeeth, setSelectedTeeth] = useState([])
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
 
@@ -198,6 +201,16 @@ export default function TratamientosClient({ paciente }) {
   }, [toast.open])
 
   const existRecords = (treatments || []).length > 0
+
+  // Piezas que aparecen en algún tratamiento, para pintarlas en el diagrama.
+  const teethConTratamiento = useMemo(
+    () => derivarTeethDeTratamientos(treatments),
+    [treatments]
+  )
+
+  // Historial por pieza: al hacer clic en un diente del diagrama.
+  const { teethMap } = useTeethCatalog()
+  const [toothHistory, setToothHistory] = useState(null)
 
   // ✅ renderiza cards (1 por grupo o 1 por single)
   const cards = useMemo(() => buildCardsFromTreatments(treatments || []), [treatments])
@@ -256,8 +269,10 @@ export default function TratamientosClient({ paciente }) {
     if (payload?.items?.length > 1) {
       const services = (payload.items || []).map((it) => ({
         service_id: it.service_id,
-        // 👇 obligatorio para tu backend
-        service_date: payload.start_date, // o newRecordDate
+        // Obligatorio para el backend. ModalServicio manda la fecha en cada
+        // item y también como `group_start_date`; nunca como `start_date`, que
+        // es lo que se leía antes y llegaba undefined -> 400.
+        service_date: it.service_date || payload.group_start_date,
         total_cost: it.total_cost,
         quantity: it.quantity ?? 0,
         teeth_ids: it.teeth_ids ?? [],
@@ -450,13 +465,18 @@ export default function TratamientosClient({ paciente }) {
       <div className="flex flex-col md:flex-row md:items-start md:gap-4">
         <div className="shrink-0 self-start md:sticky md:top-4">
          {
+          // `manual`: el clic abre el historial de la pieza en vez de alternar
+          // una selección que no alimentaba nada.
           existRecords && (
             <DiagramaTratamientos
-              activeIds={selectedTeeth}
-              onActiveIdsChange={setSelectedTeeth}
+              manual
+              onToothClick={(id) => setToothHistory(Number(String(id).replace('_', '')))}
+              treatmentTeeth={teethConTratamiento}
+              soloClickConTratamiento
+              showLegend
             />
           )
-         } 
+         }
       </div>
 
     <div className="w-full max-h-[60vh] overflow-y-auto bg-[#F5F7FB] rounded-xl">
@@ -613,6 +633,18 @@ export default function TratamientosClient({ paciente }) {
         }}
         patientId={paciente.id}
         card={paymentsTarget}
+      />
+
+      <ToothHistoryModal
+        open={toothHistory != null}
+        onOpenChange={(v) => !v && setToothHistory(null)}
+        toothCode={toothHistory}
+        treatments={treatments}
+        teethMap={teethMap}
+        onVerTratamiento={(t) => {
+          setToothHistory(null)
+          router.push(`/pacientes/${paciente.id}/tratamientos/${t.treatment_id}`)
+        }}
       />
 
       {toast.open ? (

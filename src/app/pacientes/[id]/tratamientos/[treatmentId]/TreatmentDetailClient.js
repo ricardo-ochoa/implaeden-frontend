@@ -26,7 +26,10 @@ import TreatmentPaymentsModal from '@/components/TreatmentPaymentsModal'
 import TreatmentHistoryDrawer from '@/components/TreatmentHistoryDrawer'
 import UpdateStatusModal from '@/components/UpdateStatusModal'
 import useTreatmentDocuments from '../../../../../../lib/hooks/useTreatmentDocuments'
-import DiagramaTratamientos from '@/components/tratamientos/DiagramaTratamientos'
+import DiagramaTratamientos, {
+  derivarTeethDeTratamientos,
+} from '@/components/tratamientos/DiagramaTratamientos'
+import ToothHistoryModal from '@/components/tratamientos/ToothHistoryModal'
 import TreatmentsMenu from '@/components/tratamientos/TreatmentsMenu'
 import { Box } from '@mui/material'
 import formatearFechaHora from '../../../../../../lib/utils/dateFormate'
@@ -305,6 +308,15 @@ const { openFor, modalProps } = useTreatmentStatusModal({
   const relatedTeeth = useMemo(() => {
     return normalizeTeethIds(selectedTreatment?.teeth_ids ?? selectedTreatment?.teethIds)
   }, [selectedTreatment])
+
+  // Piezas de todo el paquete, pintadas por estado en el diagrama.
+  const teethConTratamiento = useMemo(
+    () => derivarTeethDeTratamientos(treatmentsState),
+    [treatmentsState]
+  )
+
+  // Historial de la pieza al hacer clic en el diagrama.
+  const [toothHistory, setToothHistory] = useState(null)
 
   const [selectedTeeth, setSelectedTeeth] = useState([])
   const [comment, setComment] = useState('')
@@ -724,9 +736,16 @@ const treatmentsById = useMemo(() => {
             showMeta
           />
 
-          <DiagramaTratamientos 
-          activeIds={selectedTeeth}
-          onActiveIdsChange={setSelectedTeeth}
+          {/* Todo el paquete pintado por estado; el tratamiento seleccionado
+              en el menú resalta encima con el color "current". El clic abre el
+              historial de esa pieza. */}
+          <DiagramaTratamientos
+            manual
+            onToothClick={(id) => setToothHistory(Number(String(id).replace('_', '')))}
+            treatmentTeeth={teethConTratamiento}
+            currentIds={relatedTeeth}
+            soloClickConTratamiento
+            showLegend
           />
         </Box>
 
@@ -925,6 +944,24 @@ const treatmentsById = useMemo(() => {
         items={viewerItems}
         startIndex={viewerIndex}
         onIndexChange={setViewerIndex}
+      />
+
+      <ToothHistoryModal
+        open={toothHistory != null}
+        onOpenChange={(v) => !v && setToothHistory(null)}
+        toothCode={toothHistory}
+        treatments={treatmentsState}
+        teethMap={teethMap}
+        onVerTratamiento={(t) => {
+          setToothHistory(null)
+          // Si el tratamiento ya está en este paquete, basta con seleccionarlo
+          // en el menú de la izquierda; si no, se navega a su detalle.
+          const enEstePaquete = treatmentsState.some(
+            (it) => Number(it?.treatment_id ?? it?.id) === Number(t?.treatment_id)
+          )
+          if (enEstePaquete) setSelected(t.treatment_id)
+          else router.push(`/pacientes/${paciente?.id}/tratamientos/${t.treatment_id}`)
+        }}
       />
     </div>
   )

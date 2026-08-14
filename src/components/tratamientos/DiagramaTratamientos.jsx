@@ -52,6 +52,69 @@ const defaultIsInteractiveId = (id) => Boolean(extractToothId(id))
 // En tu SVG los dientes son <path class="cls-2"> (relleno blanco)
 const FILL_TARGET_SEL = '.cls-2'
 
+// Colores por estado del tratamiento. Son los mismos que usan los puntos de la
+// línea de tiempo en TratamientosClient (emerald / sky / amber), para que el
+// diagrama y la lista se lean igual.
+export const COLORES_ESTADO_TRATAMIENTO = {
+  Terminado: { fill: '#059669', stroke: '#047857', label: 'Terminado' },
+  'En proceso': { fill: '#0284c7', stroke: '#0369a1', label: 'En proceso' },
+  'Por Iniciar': { fill: '#f59e0b', stroke: '#d97706', label: 'Por iniciar' },
+}
+
+const ESTADO_POR_DEFECTO = 'Por Iniciar'
+
+const normalizeStatus = (raw) => {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (v === 'terminado') return 'Terminado'
+  if (v === 'en proceso') return 'En proceso'
+  return ESTADO_POR_DEFECTO
+}
+
+// Cuando un diente aparece en varios tratamientos, se muestra el estado que más
+// atención pide: algo en proceso pesa más que algo ya terminado.
+const PRIORIDAD_ESTADO = { 'En proceso': 3, 'Por Iniciar': 2, Terminado: 1 }
+
+/**
+ * Convierte la respuesta de tratamientos en la lista que espera `treatmentTeeth`.
+ * Acepta las dos formas que circulan en la app: la cruda del API (`teeth_ids`,
+ * `service_name`) y la mapeada por usePatientTreatments (`teethIds`).
+ *
+ * Se usa `teeth_ids` y no `group_teeth_ids`: el estado pertenece al tratamiento
+ * concreto, no a todo el paquete.
+ *
+ * @returns {Array<{id:number, status:string, label:string}>}
+ */
+export function derivarTeethDeTratamientos(treatments = []) {
+  const porDiente = new Map()
+
+  for (const t of Array.isArray(treatments) ? treatments : []) {
+    const estado = normalizeStatus(t?.status)
+    const nombre = t?.service_name || t?.group_title || 'Tratamiento'
+    const dientes = t?.teethIds ?? t?.teeth_ids ?? []
+
+    for (const raw of Array.isArray(dientes) ? dientes : []) {
+      // Number(null) es 0 y Number('') también: hay que exigir entero positivo
+      // o se cuela una "pieza 0" que no existe en el diagrama pero sí suma en
+      // el conteo de la leyenda.
+      const id = Number(raw)
+      if (!Number.isInteger(id) || id <= 0) continue
+
+      const entrada = porDiente.get(id) || { id, status: estado, tratamientos: [] }
+      if ((PRIORIDAD_ESTADO[estado] || 0) > (PRIORIDAD_ESTADO[entrada.status] || 0)) {
+        entrada.status = estado
+      }
+      entrada.tratamientos.push(`${nombre} (${estado})`)
+      porDiente.set(id, entrada)
+    }
+  }
+
+  return Array.from(porDiente.values()).map((e) => ({
+    id: e.id,
+    status: e.status,
+    label: `Pieza ${e.id} — ${e.tratamientos.join(' · ')}`,
+  }))
+}
+
 function rememberOriginal(el) {
   if (el.getAttribute('data-orig-saved') === '1') return
   el.setAttribute('data-orig-saved', '1')
@@ -120,6 +183,17 @@ export default function DiagramaTratamientos({
 
   currentIds = [],
 
+  // Dientes que aparecen en los tratamientos del paciente. Se pintan por
+  // estado y quedan por DEBAJO de la selección del usuario, para que al hacer
+  // clic siga viéndose qué eligió. Formato: [{ id, status, label }].
+  treatmentTeeth = [],
+  showLegend = false,
+
+  // Con esto, solo las piezas que aparecen en `treatmentTeeth` responden al
+  // clic (y son las únicas con cursor/hover). Evita abrir un modal vacío en
+  // los 52 dientes que no tienen nada asociado.
+  soloClickConTratamiento = false,
+
   manual = false,
   onToothClick,
 
@@ -154,6 +228,21 @@ export default function DiagramaTratamientos({
     return Array.isArray(currentIds) ? currentIds : []
   }, [currentIds])
 
+  // Map(_28 -> { status, label }). Se normaliza aquí para que quien lo use
+  // pueda mandar números (28), strings ('28') o ids del SVG ('_28').
+  const treatmentMap = useMemo(() => {
+    const map = new Map()
+    for (const item of Array.isArray(treatmentTeeth) ? treatmentTeeth : []) {
+      const tid = extractToothId(item?.id ?? item)
+      if (!tid) continue
+      map.set(tid, {
+        status: normalizeStatus(item?.status),
+        label: item?.label || '',
+      })
+    }
+    return map
+  }, [treatmentTeeth])
+
   const getSvg = () => wrapRef.current?.querySelector('svg') || null
 
   const getRootByToothId = (svg, toothId) => {
@@ -177,9 +266,21 @@ export default function DiagramaTratamientos({
   // ✅ pinta SOLO .cls-2 dentro del grupo del diente
   const paintTooth = (root, mode) => {
     if (!root) return
-    const isCurrent = mode === 'current'
-    const fill = isCurrent ? currentFill : selectedFill
-    const stroke = isCurrent ? currentStroke : selectedStroke
+
+    let fill
+    let stroke
+
+    if (mode === 'current') {
+      fill = currentFill
+      stroke = currentStroke
+    } else if (typeof mode === 'object' && mode?.fill) {
+      // capa de tratamientos: el color viene del estado
+      fill = mode.fill
+      stroke = mode.stroke
+    } else {
+      fill = selectedFill
+      stroke = selectedStroke
+    }
 
     const targets = []
 
@@ -199,6 +300,16 @@ export default function DiagramaTratamientos({
     if (!svg) return
 
     clearAllPaint(svg)
+
+    // Orden de prioridad (lo último pintado gana): tratamientos < selección
+    // del usuario < "current". Así, al hacer clic sobre un diente tratado se
+    // ve la selección y no el color de estado.
+    for (const [tid, info] of treatmentMap.entries()) {
+      const root = getRootByToothId(svg, tid)
+      if (!root) continue
+      const color = COLORES_ESTADO_TRATAMIENTO[info.status] || COLORES_ESTADO_TRATAMIENTO[ESTADO_POR_DEFECTO]
+      paintTooth(root, { fill: color.fill, stroke: color.stroke })
+    }
 
     for (const id0 of activeList || []) {
       const tid = extractToothId(id0)
@@ -296,11 +407,43 @@ export default function DiagramaTratamientos({
     svgText,
     resolvedActiveIds,
     resolvedCurrentIds,
+    treatmentMap,
     selectedFill,
     selectedStroke,
     currentFill,
     currentStroke,
   ])
+
+  // Tooltip nativo del SVG + marca de "tiene tratamiento". Va aparte del
+  // repintado porque no dependen de la selección: <title> se queda puesto y la
+  // marca es la que decide el cursor/hover en CSS.
+  useLayoutEffect(() => {
+    if (!svgText) return
+    const svg = getSvg()
+    if (!svg) return
+
+    nodeMapRef.current.forEach((root, tid) => {
+      const previo = root.querySelector(':scope > title')
+      if (previo) previo.remove()
+
+      const info = treatmentMap.get(tid)
+
+      // La marca va también en los hijos: el cursor lo decide el elemento que
+      // está debajo del puntero, que casi siempre es un <path>, no el grupo.
+      const marcar = (el) => {
+        if (info) el.setAttribute('data-con-tratamiento', '1')
+        else el.removeAttribute('data-con-tratamiento')
+      }
+      marcar(root)
+      root.querySelectorAll('*').forEach(marcar)
+
+      if (!info?.label) return
+
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title')
+      title.textContent = info.label
+      root.insertBefore(title, root.firstChild)
+    })
+  }, [svgText, treatmentMap])
 
   const emitIds = (nextIds) => {
     onActiveIdsChange?.(nextIds)
@@ -333,6 +476,8 @@ export default function DiagramaTratamientos({
   const handlePress = (toothId) => {
     const id = extractToothId(toothId)
     if (!id) return
+
+    if (soloClickConTratamiento && !treatmentMap.has(id)) return
 
     if (manual) {
       onToothClick?.(id)
@@ -370,15 +515,42 @@ export default function DiagramaTratamientos({
       <div
         ref={wrapRef}
         className={`diagram-wrap ${className}`}
+        data-solo-tratados={soloClickConTratamiento ? '1' : undefined}
         onClick={onClick}
         onKeyDown={onKeyDown}
       />
     )
   }
 
+  // Solo se listan los estados presentes: una leyenda con colores que no están
+  // en el diagrama confunde más de lo que ayuda.
+  const estadosPresentes = useMemo(() => {
+    const vistos = new Set()
+    treatmentMap.forEach((info) => vistos.add(info.status))
+    return Object.keys(COLORES_ESTADO_TRATAMIENTO).filter((estado) => vistos.has(estado))
+  }, [treatmentMap])
+
   return (
-    <div className="w-[400px] h-[500px] mx-auto bg-indigo-50 rounded-2xl p-4">
-      {content}
+    <div className="mx-auto w-[400px]">
+      <div className="h-[500px] bg-indigo-50 rounded-2xl p-4">{content}</div>
+
+      {showLegend && estadosPresentes.length ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1">
+          {estadosPresentes.map((estado) => {
+            const color = COLORES_ESTADO_TRATAMIENTO[estado]
+            return (
+              <span key={estado} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  className="h-2.5 w-2.5 rounded-sm border"
+                  style={{ backgroundColor: color.fill, borderColor: color.stroke }}
+                />
+                {color.label}
+              </span>
+            )
+          })}
+          <span className="text-xs text-muted-foreground">· {treatmentMap.size} pieza{treatmentMap.size === 1 ? '' : 's'} con tratamiento</span>
+        </div>
+      ) : null}
 
       <style jsx global>{`
         .diagram-wrap {
@@ -401,6 +573,25 @@ export default function DiagramaTratamientos({
         }
 
         .diagram-wrap [data-tooth-id]:hover {
+          opacity: 0.96;
+          filter: drop-shadow(0 2px 6px rgba(73, 27, 154, 0.25));
+          cursor: pointer;
+        }
+
+        /* Modo "solo piezas con tratamiento": el resto queda inerte. Las reglas
+           van después para ganar por orden, ya que empatan en especificidad. */
+        .diagram-wrap[data-solo-tratados='1'] [data-tooth-id],
+        .diagram-wrap[data-solo-tratados='1'] [data-tooth-id]:hover {
+          cursor: default;
+          opacity: 1;
+          filter: none;
+        }
+
+        .diagram-wrap[data-solo-tratados='1'] [data-con-tratamiento='1'] {
+          cursor: pointer;
+        }
+
+        .diagram-wrap[data-solo-tratados='1'] [data-con-tratamiento='1']:hover {
           opacity: 0.96;
           filter: drop-shadow(0 2px 6px rgba(73, 27, 154, 0.25));
           cursor: pointer;
