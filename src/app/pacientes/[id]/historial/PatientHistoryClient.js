@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import api, { fetcher } from '../../../../../lib/api'
 import { descargarArchivo, mensajeDeErrorBlob } from '../../../../../lib/utils/descargarArchivo'
+import { useDescargarHistorial } from '../../../../../lib/hooks/useDescargarHistorial'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -112,6 +113,9 @@ export default function PatientHistoryClient({
 
   const [isSaving, setIsSaving] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  // El PDF del historial completo lo maneja el hook (compartido con la ficha
+  // del paciente); `isDownloading` queda para el PDF de un expediente suelto.
+  const { descargando, descargar: descargarPdf } = useDescargarHistorial(pid)
   const [isDownloading, setIsDownloading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -177,35 +181,6 @@ export default function PatientHistoryClient({
     )
     setPreviewIndex(index)
     setPreviewOpen(true)
-  }
-
-  // El PDF lo arma el backend. Sin `fecha` baja el historial completo —los
-  // expedientes capturados en la app y los escaneados, intercalados por fecha—;
-  // con `fecha`, solo los archivos escaneados de ese día.
-  const descargarPdf = async (fecha) => {
-    setIsDownloading(true)
-    try {
-      const { headers } = await descargarArchivo(
-        `/clinical-histories/${pid}/pdf${fecha ? `?date=${fecha}` : ''}`,
-        fecha ? `expediente-${fecha}.pdf` : 'historial-clinico.pdf'
-      )
-
-      // El backend avisa por cabecera qué no pudo meter (formatos que un PDF no
-      // admite, archivos que ya no están en el bucket, expedientes ilegibles).
-      const omitidos = Number(headers['x-archivos-omitidos'] || 0)
-      if (omitidos > 0) {
-        toast.warning(
-          `PDF descargado, pero ${omitidos} elemento${omitidos === 1 ? '' : 's'} no se pudo incluir. Ver la última página.`
-        )
-      } else {
-        toast.success('PDF descargado')
-      }
-    } catch (err) {
-      console.error(err)
-      toast.error(await mensajeDeErrorBlob(err, 'No se pudo generar el PDF'))
-    } finally {
-      setIsDownloading(false)
-    }
   }
 
   // El expediente capturado en la app se imprime desde su JSON: el backend
@@ -335,7 +310,7 @@ export default function PatientHistoryClient({
   return (
     <>
       {/* Overlay loading (guardando/eliminando/creando) */}
-      {(isSaving || isDeleting || isCreating || isDownloading) ? (
+      {(isSaving || isDeleting || isCreating || isDownloading || descargando) ? (
         <Dialog open>
           <DialogContent className="sm:max-w-[420px]">
             <DialogHeader className="sr-only">
@@ -368,11 +343,12 @@ export default function PatientHistoryClient({
 
       {/* CTAs */}
       <div className="flex flex-wrap justify-end gap-2">
-        {/* Descarga todo el historial escaneado en un solo PDF, cronológico. */}
+        {/* Todo el historial en un solo PDF, cronológico: expedientes
+            capturados en la app + archivos escaneados. */}
         <Button
           variant="outline"
           onClick={() => descargarPdf()}
-          disabled={!hayAlgoQueDescargar}
+          disabled={!hayAlgoQueDescargar || descargando}
           title={
             hayAlgoQueDescargar
               ? 'Descargar el historial completo en un PDF: expedientes y archivos escaneados'

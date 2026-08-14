@@ -82,6 +82,7 @@ export default function PatientDetailClient({ patient, patientId, menuCards = []
       <div className="w-full lg:max-w-sm shrink-0">
         <BasicInfoCard
           patient={patient}
+          patientId={patientId}
           menuCards={menuCards}
           activeMenu={isMobile ? "" : activeMenu}
           onMenuSelect={isMobile ? undefined : setActiveMenu}

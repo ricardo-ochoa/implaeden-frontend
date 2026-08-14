@@ -15,6 +15,8 @@ import {
   Folder,
   Calendar,
   Copy,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -30,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import EditPatientModal from './EditPatientModal';
 import ImageDetailModal from './ImageDetailModal';
 import { useRandomAvatar } from '../../lib/hooks/useRandomAvatar';
+import { useDescargarHistorial } from '../../lib/hooks/useDescargarHistorial';
 
 const cx = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -105,6 +108,7 @@ const iconByTitle = (title) => {
 
 export default function BasicInfoCard({
   patient: initialPatient,
+  patientId,
   onPatientUpdate,
   menuCards = [],
   activeMenu = 'Tratamientos',
@@ -118,6 +122,11 @@ export default function BasicInfoCard({
   const [isLoading, setIsLoading] = useState(!initialPatient);
 
   const defaultAvatar = useRandomAvatar();
+
+  // Historial completo en PDF sin entrar a la sección: mismo endpoint y mismos
+  // mensajes que el botón "Descargar todo" del historial.
+  const idPaciente = patientId || patient?.id;
+  const { descargando, descargar: descargarHistorial } = useDescargarHistorial(idPaciente);
 
   useEffect(() => {
     if (initialPatient) {
@@ -310,6 +319,26 @@ export default function BasicInfoCard({
                 <span>
                   <Mail className="h-6 w-6" />
                 </span>
+              )}
+            </Button>
+
+            {/* Historial clínico completo en PDF. No se sabe desde aquí si el
+                paciente tiene algo capturado, así que el botón siempre está
+                disponible y el backend responde si no hay nada. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-14 w-14 rounded-full cursor-pointer"
+              disabled={isLoading || descargando || !idPaciente}
+              aria-label="Descargar historial clínico"
+              title="Descargar historial clínico en PDF"
+              onClick={() => descargarHistorial()}
+            >
+              {descargando ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : (
+                <Download className="h-6 w-6" />
               )}
             </Button>
             </div>
