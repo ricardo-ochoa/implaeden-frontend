@@ -63,6 +63,10 @@ export const createEmptyExpediente = () => ({
     return acc
   }, {}),
   heredofamiliaresOtros: '',
+  // Los checkboxes de arriba no distinguen "no tiene antecedentes" de "no se
+  // preguntó": ambos casos se ven como cuatro casillas vacías. Esta bandera
+  // deja constancia de que sí se interrogó y el paciente no refirió nada.
+  heredofamiliaresSinAntecedentes: false,
 
   // §5 Antecedentes personales patológicos (presente: null = sin responder)
   antecedentesPatologicos: ANTECEDENTES_PATOLOGICOS.reduce((acc, item) => {
@@ -81,6 +85,9 @@ export const createEmptyExpediente = () => ({
   fumaCigarrosPorDia: '',
 
   // §8 Antecedentes gineco-obstétricos
+  // `embarazada` es cuatri-estado: true / false / NO_APLICA / null (sin
+  // responder). "No aplica" existe porque la pregunta es obligatoria pero no
+  // le corresponde a todo paciente.
   embarazada: null,
   mesesGestacion: '',
   problemaPeriodoMenstrual: '',

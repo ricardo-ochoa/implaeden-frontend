@@ -4,15 +4,19 @@
 // antecedentes gineco-obstétricos.
 //
 // La sección gineco-obstétrica se muestra siempre, no condicionada al sexo: es
-// lo que recomienda el spec para no hacer suposiciones sobre el paciente.
+// lo que recomienda el spec para no hacer suposiciones sobre el paciente. Por lo
+// mismo el embarazo admite "No aplica": la pregunta es obligatoria, pero no le
+// corresponde a todo paciente y un "No" a secas sería impreciso.
 
 import { Controller, useFormContext } from 'react-hook-form'
 
 import Campo from '../shared/Campo'
-import { SiNoToggle } from '../shared/SiNoField'
+import { PendienteTag, SiNoToggle } from '../shared/SiNoField'
+import { respondido } from '../completitud'
 
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 
 export default function AntecedentesNoPatologicosSection({ readOnly }) {
   const { control, register, watch } = useFormContext()
@@ -25,21 +29,31 @@ export default function AntecedentesNoPatologicosSection({ readOnly }) {
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Antecedentes personales no patológicos</h3>
 
-        <div className="space-y-3 rounded-md border p-3">
+        <div
+          className={cn(
+            'space-y-3 rounded-md border p-3',
+            !respondido(fuma) && 'border-l-2 border-l-amber-400'
+          )}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium">¿Fuma?</p>
-            <Controller
-              name="fuma"
-              control={control}
-              render={({ field }) => (
-                <SiNoToggle
-                  name="Fuma"
-                  value={field.value ?? null}
-                  onChange={field.onChange}
-                  disabled={readOnly}
-                />
-              )}
-            />
+            <p className="text-sm font-medium">
+              ¿Fuma?<span className="ml-0.5 text-destructive">*</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {!respondido(fuma) ? <PendienteTag /> : null}
+              <Controller
+                name="fuma"
+                control={control}
+                render={({ field }) => (
+                  <SiNoToggle
+                    name="Fuma"
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    disabled={readOnly}
+                  />
+                )}
+              />
+            </div>
           </div>
 
           {fuma === true ? (
@@ -72,24 +86,37 @@ export default function AntecedentesNoPatologicosSection({ readOnly }) {
       <section className="space-y-3">
         <div>
           <h3 className="text-sm font-semibold">Antecedentes gineco-obstétricos</h3>
-          <p className="text-xs text-muted-foreground">Llenar solo si aplica.</p>
+          <p className="text-xs text-muted-foreground">
+            Si no le corresponde al paciente, marca &ldquo;No aplica&rdquo;.
+          </p>
         </div>
 
-        <div className="space-y-3 rounded-md border p-3">
+        <div
+          className={cn(
+            'space-y-3 rounded-md border p-3',
+            !respondido(embarazada) && 'border-l-2 border-l-amber-400'
+          )}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-medium">¿Está embarazada?</p>
-            <Controller
-              name="embarazada"
-              control={control}
-              render={({ field }) => (
-                <SiNoToggle
-                  name="Embarazada"
-                  value={field.value ?? null}
-                  onChange={field.onChange}
-                  disabled={readOnly}
-                />
-              )}
-            />
+            <p className="text-sm font-medium">
+              ¿Está embarazada?<span className="ml-0.5 text-destructive">*</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {!respondido(embarazada) ? <PendienteTag /> : null}
+              <Controller
+                name="embarazada"
+                control={control}
+                render={({ field }) => (
+                  <SiNoToggle
+                    name="Embarazada"
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    disabled={readOnly}
+                    permiteNoAplica
+                  />
+                )}
+              />
+            </div>
           </div>
 
           {embarazada === true ? (

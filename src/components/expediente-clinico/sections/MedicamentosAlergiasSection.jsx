@@ -1,6 +1,9 @@
 'use client'
 
 // §6 del formato — Medicamentos y alergias.
+// Ambas preguntas son obligatorias: se responden Sí o No, nunca se dejan en
+// blanco. Y un "Sí" exige el "¿cuál?", que es el dato que hay que conocer antes
+// de tratar (qué toma, a qué es alérgico).
 
 import { Controller, useFormContext } from 'react-hook-form'
 
@@ -37,6 +40,8 @@ export default function MedicamentosAlergiasSection({ readOnly }) {
           render={({ field }) => (
             <SiNoField
               label={pregunta.label}
+              requerido
+              detalleRequerido
               disabled={readOnly}
               value={field.value?.presente ?? null}
               onChange={(presente) => field.onChange({ ...field.value, presente })}

@@ -56,7 +56,9 @@ import ConfirmDeleteModal from '@/components/ConfirmDeleteModal'
 // traería el equivocado en el build de producción.
 import FilePreviewModal from '@/components/FilePreviewModal.jsx'
 import { ESTADOS_EXPEDIENTE } from '@/components/expediente-clinico/constants'
+import { resumenCompletitud } from '@/components/expediente-clinico/completitud'
 import { hoyYMD, normalizeExpediente, resumenExpediente } from '@/components/expediente-clinico/defaults'
+import { cn } from '@/lib/utils'
 
 const esPdf = (url) => (url || '').toLowerCase().endsWith('.pdf')
 const nombreArchivo = (url) => (url || '').split('/').pop() || 'archivo'
@@ -157,8 +159,11 @@ export default function PatientHistoryClient({
     )
   }, [clinicalRecords, expedientes])
 
-  // Solo los escaneados se pueden exportar a PDF hoy.
+  // "Descargar todo" arma un PDF con los expedientes capturados en la app y los
+  // archivos escaneados, así que basta con que exista cualquiera de los dos.
   const hayArchivos = (clinicalRecords || []).length > 0
+  const hayExpedientes = (expedientes || []).length > 0
+  const hayAlgoQueDescargar = hayArchivos || hayExpedientes
 
   // Abre la galería con todos los archivos de esa fecha, posicionada en el que
   // se tocó, para poder pasar entre ellos sin cerrar y volver a abrir.
@@ -174,22 +179,23 @@ export default function PatientHistoryClient({
     setPreviewOpen(true)
   }
 
-  // Descarga los escaneados como un solo PDF. Sin `fecha` baja todo el
-  // historial; con `fecha`, solo ese registro. El PDF lo arma el backend.
+  // El PDF lo arma el backend. Sin `fecha` baja el historial completo —los
+  // expedientes capturados en la app y los escaneados, intercalados por fecha—;
+  // con `fecha`, solo los archivos escaneados de ese día.
   const descargarPdf = async (fecha) => {
     setIsDownloading(true)
     try {
       const { headers } = await descargarArchivo(
         `/clinical-histories/${pid}/pdf${fecha ? `?date=${fecha}` : ''}`,
-        `expediente-${fecha || 'completo'}.pdf`
+        fecha ? `expediente-${fecha}.pdf` : 'historial-clinico.pdf'
       )
 
-      // El backend avisa por cabecera qué archivos no pudo meter (formatos que
-      // un PDF no admite, o que ya no están en el bucket).
+      // El backend avisa por cabecera qué no pudo meter (formatos que un PDF no
+      // admite, archivos que ya no están en el bucket, expedientes ilegibles).
       const omitidos = Number(headers['x-archivos-omitidos'] || 0)
       if (omitidos > 0) {
         toast.warning(
-          `PDF descargado, pero ${omitidos} archivo${omitidos === 1 ? '' : 's'} no se pudo incluir. Ver la última página.`
+          `PDF descargado, pero ${omitidos} elemento${omitidos === 1 ? '' : 's'} no se pudo incluir. Ver la última página.`
         )
       } else {
         toast.success('PDF descargado')
@@ -366,11 +372,11 @@ export default function PatientHistoryClient({
         <Button
           variant="outline"
           onClick={() => descargarPdf()}
-          disabled={!hayArchivos}
+          disabled={!hayAlgoQueDescargar}
           title={
-            hayArchivos
-              ? 'Descargar todos los archivos escaneados en un PDF'
-              : 'No hay archivos escaneados que descargar'
+            hayAlgoQueDescargar
+              ? 'Descargar el historial completo en un PDF: expedientes y archivos escaneados'
+              : 'No hay expedientes ni archivos que descargar'
           }
         >
           <Download className="h-4 w-4 mr-2" />
@@ -516,12 +522,37 @@ function ExpedienteRow({ item, onOpen, onDownload, onDelete }) {
   const estado = ESTADOS_EXPEDIENTE[expediente.status] || ESTADOS_EXPEDIENTE.borrador
   const resumen = resumenExpediente(expediente)
 
+  // Mismas reglas que el stepper del wizard: verde cuando los 11 pasos tienen
+  // respuesta, ámbar cuando falta algún obligatorio (los que impiden marcarlo
+  // como completado).
+  const { contestados, total, obligatoriosPendientes } = resumenCompletitud(expediente.form_data)
+  const completoTodo = contestados === total
+
   return (
     <RowShell
       icon={<FileText className="h-4 w-4" />}
       titulo="Expediente clínico"
       fecha={`Consulta del ${formatYMD(item.fecha)}`}
-      badge={<Badge variant={estado.variant}>{estado.label}</Badge>}
+      badge={
+        <>
+          <Badge variant={estado.variant}>{estado.label}</Badge>
+          <Badge
+            variant="outline"
+            className={cn(
+              'tabular-nums',
+              completoTodo && 'border-emerald-500/60 text-emerald-700 dark:text-emerald-400',
+              obligatoriosPendientes && 'border-amber-400 text-amber-700 dark:text-amber-400'
+            )}
+            title={
+              obligatoriosPendientes
+                ? `${contestados} de ${total} pasos contestados · ${obligatoriosPendientes} obligatorio(s) pendiente(s)`
+                : `${contestados} de ${total} pasos contestados`
+            }
+          >
+            {contestados}/{total}
+          </Badge>
+        </>
+      }
       resumen={resumen}
       acciones={
         <>

@@ -17,6 +17,15 @@ export const METADATOS_FORMATO = {
 
 export const SEXO_OPCIONES = ['Femenino', 'Masculino', 'Otro']
 
+// Tercer valor de los toggles Sí/No, para preguntas que no aplican a todo
+// paciente (§8 gineco-obstétricos). Se guarda en el JSON, así que este string
+// tampoco debe cambiar una vez en producción.
+export const NO_APLICA = 'na'
+
+// Motivo que se registra cuando el paciente llega sin una queja concreta: el
+// renglón del papel nunca se deja en blanco.
+export const MOTIVO_POR_DEFECTO = 'Revisión general'
+
 export const ESCOLARIDAD_OPCIONES = [
   'Sin estudios',
   'Primaria',
