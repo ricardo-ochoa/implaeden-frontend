@@ -8,6 +8,14 @@ import { useRouter, usePathname } from 'next/navigation';
 
 const AuthContext = createContext(null);
 
+// Rutas a las que se entra sin sesión. `/constancia/<token>` la abre el propio
+// paciente desde el link privado: si el guardia lo mandara a /login, el feature
+// no serviría de nada. El matcher de middleware.js tampoco las cubre.
+const PUBLIC_ROUTES = ['/login', '/constancia'];
+
+const isPublicRoute = (pathname) =>
+  PUBLIC_ROUTES.some((base) => pathname === base || pathname?.startsWith(`${base}/`));
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [booted, setBooted] = useState(false);
@@ -88,10 +96,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!booted) return;
 
-    const publicRoutes = ['/login']; // agrega aquí otras públicas si quieres
-    const isPublic = publicRoutes.includes(pathname);
-
-    if (!user && !isPublic) {
+    if (!user && !isPublicRoute(pathname)) {
       router.replace('/login');
     }
   }, [booted, user, pathname, router]);
@@ -100,8 +105,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const onUnauthorized = () => {
       logout();
-      // evita loop si ya estás en login
-      if (pathname !== '/login') router.replace('/login');
+      // evita loop si ya estás en login, y no expulsa al paciente de una
+      // página pública (el link de la constancia no lleva sesión).
+      if (!isPublicRoute(pathname)) router.replace('/login');
     };
 
     window.addEventListener('auth:unauthorized', onUnauthorized);

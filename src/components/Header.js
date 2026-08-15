@@ -12,6 +12,13 @@ import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { Settings } from "lucide-react";
 
+// Rutas que se comparten con gente de fuera de la clínica: no deben mostrar la
+// navegación interna ni el botón de sesión. Son páginas de una sola tarea.
+const RUTAS_SIN_HEADER = ["/constancia"];
+
+const esRutaPublica = (pathname) =>
+  RUTAS_SIN_HEADER.some((base) => pathname === base || pathname?.startsWith(`${base}/`));
+
 function NavLink({ href, children, active }) {
   return (
     <Link
@@ -61,6 +68,9 @@ export default function Header() {
     (theme === "dark" || (theme === "system" && resolvedTheme === "dark"));
 
   const logoSrc = isDark ? "/logo_dark.svg" : "/logo.svg";
+
+  // Va después de todos los hooks para no alterar su orden entre renders.
+  if (esRutaPublica(pathname)) return null;
 
   if (loading) {
     return (

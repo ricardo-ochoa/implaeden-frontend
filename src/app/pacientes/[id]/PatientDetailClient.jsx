@@ -22,6 +22,10 @@ const CitasClient = dynamic(() => import("./citas/CitasClient"), {
   ssr: false,
   loading: () => <PanelLoading />,
 });
+const PatientFiscalClient = dynamic(() => import("./fiscal/PatientFiscalClient"), {
+  ssr: false,
+  loading: () => <PanelLoading />,
+});
 
 function PanelLoading() {
   return (
@@ -72,6 +76,8 @@ export default function PatientDetailClient({ patient, patientId, menuCards = []
         />
       );
     if (t.includes("cita")) return <CitasClient patientId={patientId} paciente={patient} />;
+    if (t.includes("fiscal") || t.includes("factur"))
+      return <PatientFiscalClient patientId={patientId} patient={patient} />;
 
     return <TratamientosClient paciente={{ id: patientId }} />;
   }, [activeMenu, patientId, patient]);

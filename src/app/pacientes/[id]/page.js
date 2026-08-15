@@ -46,6 +46,11 @@ export default async function PatientDetailPage({ params }) {
       description: "Fecha e información de cada cita del paciente.",
       redirect: `/pacientes/${id}/citas`,
     },
+    {
+      title: "Datos fiscales",
+      description: "Constancia de situación fiscal y datos para facturar.",
+      redirect: `/pacientes/${id}/fiscal`,
+    },
   ];
 
   return (
