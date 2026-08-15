@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -19,9 +19,16 @@ import {
 
 import { useAuth } from '@/context/AuthContext'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { login } = useAuth()
+
+  // Se llega aquí por sesión caducada, no por un error: hay que decirlo, o el
+  // usuario siente que la app falló. `volver` guarda dónde estaba para no
+  // tirarlo siempre a /pacientes.
+  const sesionExpirada = searchParams.get('sesion') === 'expirada'
+  const volverA = searchParams.get('volver')
 
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -48,7 +55,8 @@ export default function LoginPage() {
       if (!body?.accessToken) throw new Error('Respuesta inválida: no llegó accessToken')
 
       login(body.accessToken)
-      router.replace('/pacientes')
+      // Regresa a donde estaba cuando expiró la sesión, si venía de ahí.
+      router.replace(volverA && volverA.startsWith('/') ? volverA : '/pacientes')
     } catch (err) {
       setError(err?.message || 'Ocurrió un error inesperado')
     } finally {
@@ -68,6 +76,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="p-6 space-y-6">
+            {sesionExpirada && !error ? (
+              <Alert>
+                <AlertDescription>
+                  Tu sesión expiró por seguridad. Vuelve a entrar para continuar.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -134,5 +150,21 @@ export default function LoginPage() {
         </form>
       </Card>
     </div>
+  )
+}
+
+// `useSearchParams` obliga a un límite de Suspense: /login se prerenderiza como
+// estática y sin esto el build de Next falla.
+export default function LoginPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-[90vh] flex items-center justify-center p-4">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </React.Suspense>
   )
 }
