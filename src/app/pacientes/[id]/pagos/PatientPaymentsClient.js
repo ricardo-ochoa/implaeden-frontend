@@ -287,7 +287,7 @@ export default function PatientPaymentsClient({
     try {
       const pdf = await generatePDF(payment, paciente, true)
       const fd = new FormData()
-      fd.append('pdf', pdf, `Factura_${payment.numero_factura}.pdf`)
+      fd.append('pdf', pdf, `Recibo_${payment.numero_factura}.pdf`)
       fd.append('to', paciente.email)
 
       const res = await api.post('/email/enviar-factura', fd)
